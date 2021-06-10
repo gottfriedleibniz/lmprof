@@ -18,7 +18,7 @@ function PrintUsage(errorMessage)
     local usageMessage = [[
 script [--input] [--output] [--format] [--path] [--args] [-h | --help]
   [-t | --time] [-m | --memory] [-e | --trace] [-l | --lines] [-s | --sample] [--single_thread]
-  [--micro] [--compress_graph] [--load_stack] [--mismatch] [--line_freq] [--ignore_yield] [-g | --disable_gc] [-i | --instructions]
+  [--micro] [--compress_graph] [--load_stack] [--mismatch] [--line_freq] [--ignore_yield] [--gc_count] [-g | --disable_gc] [-i | --instructions]
   [-p | --process] [-f | --draw_frame] [-c | --compress] [--split] [--tracing] [--page_limit] [--name] [--url]
   [--callgrind] [--pepper] [--json] [--sort] [--csv] [--show_lines] [-v | --verbose]
 
@@ -48,6 +48,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
     --mismatch: allow start/stop mismatching (i.e., empty profile stacks) during execution.
     --line_freq: Create a frequency list of line-executions for each profiled Lua function (graph instrumentation)
     --ignore_yield: Ignore all coroutine.yield() records.
+    --gc_count: Include LUA_GCCOUNT (the amount of memory in use by Lua) information on profiler initialization.
     --disable_gc: Disable the Lua garbage collector for the duration of the profile.
     --instructions=count: Number of Lua instructions to execute before generating a 'sampling' event.
     --calibrate: perform a calibration, i.e., determine an estimation, preferably an underestimation, of the Lua function call overhead.
@@ -181,6 +182,7 @@ lmprof.set_option("load_stack", options:Bool("load_stack", "", true))
 lmprof.set_option("mismatch", options:Bool("mismatch", "", false))
 lmprof.set_option("line_freq", options:Bool("line_freq", "", false))
 lmprof.set_option("ignore_yield", options:Bool("ignore_yield", "", false))
+lmprof.set_option("gc_count", options:Bool("gc_count", "", false))
 lmprof.set_option("disable_gc", options:Bool("disable_gc", "g", false))
 if sample_mode then
     lmprof.set_option("instructions", options:Int("instructions", "i", 1000))

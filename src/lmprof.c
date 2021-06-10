@@ -1211,6 +1211,7 @@ EXTERN_OPT const char *const lmprof_option_strings[] = {
   "load_stack",
   "mismatch",
   "compress_graph",
+  "gc_count",
   "verbose",
   "output_string",
   "line_freq",
@@ -1237,6 +1238,7 @@ EXTERN_OPT const uint32_t lmprof_option_codes[] = {
   LMPROF_OPT_LOAD_STACK,
   LMPROF_OPT_STACK_MISMATCH,
   LMPROF_OPT_COMPRESS_GRAPH,
+  LMPROF_OPT_GC_COUNT_INIT,
   LMPROF_OPT_REPORT_VERBOSE,
   LMPROF_OPT_REPORT_STRING,
   LMPROF_OPT_LINE_FREQUENCY,
@@ -1313,6 +1315,7 @@ LUALIB_API int lmprof_set_option(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_COMPRESS_GRAPH:
+    case LMPROF_OPT_GC_COUNT_INIT:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
@@ -1393,6 +1396,7 @@ LUALIB_API int lmprof_get_option(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_COMPRESS_GRAPH:
+    case LMPROF_OPT_GC_COUNT_INIT:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:

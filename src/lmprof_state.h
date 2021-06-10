@@ -50,6 +50,7 @@
 #define LMPROF_OPT_LOAD_STACK        0x10 /* Use 'lua_getstack' to populate a lmprof_Stack (with its traceback) on instantiation */
 #define LMPROF_OPT_STACK_MISMATCH    0x20 /* Allow start/stop to be called at different stack levels. */
 #define LMPROF_OPT_COMPRESS_GRAPH    0x40 /* p_id is defined by the parents f_id; otherwise the parents record id */
+#define LMPROF_OPT_GC_COUNT_INIT     0x80 /* Include garbage collector statistics (LUA_GCCOUNT[B]) on profiler init */
 
 #define LMPROF_OPT_REPORT_VERBOSE       0x1000 /* Include additional debug information */
 #define LMPROF_OPT_REPORT_STRING        0x2000 /* Output a formatted Lua string instead of an encoded table. */

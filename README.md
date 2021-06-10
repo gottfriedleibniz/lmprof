@@ -51,6 +51,9 @@ The exported API is broken down into four categories: **Configuration**, **Profi
 --      lmprof.time_unit() for the base measurement of time.
 --    'disable_gc' - Disable the Lua garbage collector for the duration of the
 --      profile.
+--    'gc_count' - Include LUA_GCCOUNT (the amount of memory in use by Lua)
+--      information on profiler initialization. Note, this value will not
+--      include memory managed by external C libraries that use lua_getallocf.
 --    'reinit_clock' - Reinitialize, e.g., QueryPerformanceFrequency, the
 --      profiler clock prior to profiling.
 --    'mismatch' - allow call stack mismatching, i.e., start/stop not called in
@@ -417,6 +420,7 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 
 ### TODO
 Ordered by priority.
+1. Update example outputs in [docs](docs/): most are outdated.
 1. Refactor. See the note in the header of lmprof.c.
 1. Handle RDTSC reset and `lu_time` overflows (especially on 32bit builds).
 1. Improve [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html) support, e.g., multi-threaded layouts.

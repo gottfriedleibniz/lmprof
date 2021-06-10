@@ -1038,6 +1038,12 @@ LUA_API int lmprof_initialize_profiler(lua_State *L, lmprof_State *st, int idx, 
     st->hook.flags = (fhook == l_nullptr) ? 0 : flags;
     st->hook.line_count = (fhook == l_nullptr) ? 0 : line_count;
 
+    if (BITFIELD_TEST(st->conf, LMPROF_OPT_GC_COUNT_INIT)
+        && !BITFIELD_TEST(st->conf, LMPROF_OPT_TRACE_LAYOUT_SPLIT)) {
+      const lu_size size = (l_cast(lu_size, lua_gc(L, LUA_GCCOUNT, 0)) << 10) + lua_gc(L, LUA_GCCOUNTB, 0);
+      st->thread.r.s.allocated = size;
+    }
+
     /* For all reachable coroutines: initialize their profiler hooks */
     lmprof_initialize_thread(L, st, l_nullptr);
     if (!BITFIELD_TEST(st->mode, LMPROF_MODE_SINGLE_THREAD)) {
@@ -1184,6 +1190,7 @@ static int state_getoption(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_COMPRESS_GRAPH:
+    case LMPROF_OPT_GC_COUNT_INIT:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
@@ -1237,6 +1244,7 @@ static int state_setoption(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_COMPRESS_GRAPH:
+    case LMPROF_OPT_GC_COUNT_INIT:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:

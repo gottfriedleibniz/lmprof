@@ -8,7 +8,7 @@
 #include <lua.h>
 
 #define LMPROF_NAME "lmprof"
-#define LMPROF_VERSION "lmprof 0.1.13"
+#define LMPROF_VERSION "lmprof 0.1.14"
 #define LMPROF_COPYRIGHT "Copyright (C) 2021, Gottfried Leibniz"
 #define LMPROF_DESCRIPTION "A Lua Profiler"
 #if !defined(LUAMOD_API)
@@ -157,6 +157,9 @@ LUALIB_API int lmprof_profile_function(lua_State *L);
 **    'micro' - Ensure times are measured on a microsecond scale.
 **    'disable_gc' - Disable the Lua garbage collector for the duration of the
 **      profile.
+**    'gc_count' - Include LUA_GCCOUNT (the amount of memory in use by Lua)
+**      information on profiler initialization. Note, this value will not
+**      include memory managed by external C libraries that use lua_getallocf.
 **    'reinit_clock' - Reinitialize, e.g., QueryPerformanceFrequency, the
 **      profiler clock prior to profiling.
 **    'mismatch' - allow call stack mismatching, i.e., start/stop not called in

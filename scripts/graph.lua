@@ -178,6 +178,9 @@ LMNode = setmetatable({
         deallocated = { Label = "Dealloc", Cat = "Binary" },
         total_deallocated = { Label = "Dealloc", Cat = "Binary" },
         lines = { Label = "Lines", Cat = "Table" },
+        id = { Label = "ID", Cat = "String" },
+        parent = { Label = "PID", Cat = "String" },
+        depth = { Label = "Depth", Cat = "Count", Sort = function(fa, fb) return fa.depth - fb.depth end },
 
         -- Extended fields
         timePerCount = { Label = "Time/Call", Cat = "TimeAverage" },
@@ -208,6 +211,7 @@ function LMNode.New(id, record, previous)
         child_count = 0, -- Total number of sampler hits in all descendants
         -- Graph Structure
         rechable = false,
+        depth = math.huge, -- Distance from root
         parents = { },
         children = { },
     }, LMNode)
@@ -258,11 +262,12 @@ function LMNode:Append(header, record, parentNode)
     local tcp = "%(%.%.%.tail calls%.%.%.%)"
     local name = self.name
     local r_name = record.source
+    local r_id = (header.compress_graph and record.func) or record.id
 
     -- Ensure parent/child relationship is set.
     if parentNode ~= nil then
         self.parents[record.parent] = parentNode
-        parentNode.children[record.func] = self
+        parentNode.children[r_id] = self
     end
 
     -- always try to use the function name instead of (...tail calls...)
@@ -274,7 +279,10 @@ function LMNode:Append(header, record, parentNode)
 
     -- Update statistics. Do not update the 'total' fields for self calls as
     -- they will have been handled by 'measured_pop'.
-    if record.func ~= record.parent then
+    --
+    -- @NOTE: When compress_graph is enabled, record.parent is its unique
+    --  record identifier, not the function identifier.
+    if r_id ~= record.parent then
         for k,_ in pairs(self) do
             local f = LMNode.Fields[k]
             if record[k] and f and (f.Cat == "Count" or f.Cat == "Time" or f.Cat == "Binary") then
@@ -307,17 +315,20 @@ end
     Depth-first iterate through the reduced graph structure, setting a reachable
     field to each processed node to true.
 --]]
-function LMNode:DepthFirstReachable()
+function LMNode:DepthFirstReachable(depth)
     if not self.reachable then
         local child_count = 0
 
+        self.depth = depth
         self.reachable = true
         for _,childNode in pairs(self.children) do
-            childNode:DepthFirstReachable()
+            childNode:DepthFirstReachable(depth + 1)
             child_count = child_count + childNode.child_count + childNode.count
         end
 
         self.child_count = child_count
+    else
+        self.depth = math.min(self.depth or 0, depth)
     end
 end
 
@@ -341,11 +352,11 @@ LMGraph = setmetatable({
         successive fields are used to handle tie breaks.
     --]]
     Sorting = {
-        count = { "count", "name" },
-        time = { "time", "count", "name"  },
-        total_time = { "total_time", "count", "name"  },
-        allocated = { "allocated", "count", "name" },
-        total_allocated = { "total_allocated", "count", "name" },
+        count = { "count", "depth", "name" },
+        time = { "time", "count", "depth", "name"  },
+        total_time = { "total_time", "count", "depth", "name"  },
+        allocated = { "allocated", "count", "depth", "name" },
+        total_allocated = { "total_allocated", "count", "depth", "name" },
     },
 
 }, {
@@ -375,7 +386,7 @@ function LMGraph.New(header, outputTable)
     -- identifier, in one object.
     for i=1,#outputTable do
         local record = outputTable[i]
-        local recordId = record.func
+        local recordId = (header.compress_graph and record.func) or record.id
         local parentRecordId = record.parent
 
         local node = self.functions[recordId]
@@ -418,7 +429,7 @@ function LMGraph.New(header, outputTable)
     -- Ensure the graph is completely connected, i.e., an undirected path exists
     -- between all funcNodes. ... This script doesn't support multiple subgraphs
     -- at the moment although a trivial extension.
-    self.root:DepthFirstReachable()
+    self.root:DepthFirstReachable(0)
     for id,node in pairs(self.functions) do
         if not node.reachable then
             error(("%s is not reachable!"):format(node.name))
@@ -427,6 +438,9 @@ function LMGraph.New(header, outputTable)
         -- Ensure the child table if each node is properly initialized
         for pid,parentNode in pairs(node.parents) do
             parentNode.children[id] = node
+            if not header.compress_graph and not node.parent then
+                node.parent = parentNode.id
+            end
         end
     end
 
@@ -581,6 +595,14 @@ function LMGraph:Flat(header, outfile)
         "allocPercent", "allocated", "total_allocated", "allocPerCount", "totalAllocPerCount",
         "name", "lines",
     }
+
+    -- For non-compressed graphs include the nodes 'depth' (i.e., distance from
+    -- root), identifier, and parent identifier.
+    if not header.compress_graph then
+        table.insert(flatColumns, #flatColumns, "depth")
+        table.insert(flatColumns, #flatColumns, "id")
+        table.insert(flatColumns, #flatColumns, "parent")
+    end
 
     local max_time = self.global.max_time
     local max_size = self.global.max_size

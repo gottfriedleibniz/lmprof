@@ -18,7 +18,7 @@ function PrintUsage(errorMessage)
     local usageMessage = [[
 script [--input] [--output] [--format] [--path] [--args] [-h | --help]
   [-t | --time] [-m | --memory] [-e | --trace] [-l | --lines] [-s | --sample] [--single_thread]
-  [--micro] [--load_stack] [--mismatch] [--line_freq] [--ignore_yield] [-g | --disable_gc] [-i | --instructions]
+  [--micro] [--compress_graph] [--load_stack] [--mismatch] [--line_freq] [--ignore_yield] [-g | --disable_gc] [-i | --instructions]
   [-p | --process] [-f | --draw_frame] [-c | --compress] [--split] [--tracing] [--page_limit] [--name] [--url]
   [--pepper] [--json] [--sort] [--csv] [--show_lines] [-v | --verbose]
 
@@ -43,6 +43,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
 [OPTIONS]
   [Base]:
     --micro: Ensure times are measured on a microsecond scale.
+    --compress_graph: A 'compressed' graph representation: all instances of the same function are accumulated in one node.
     --load_stack: Populate each profile stack with its traceback on instantiation.
     --mismatch: allow start/stop mismatching (i.e., empty profile stacks) during execution.
     --line_freq: Create a frequency list of line-executions for each profiled Lua function (graph instrumentation)
@@ -168,6 +169,7 @@ end
 lmprof.set_option("verbose", options:Bool("verbose", "v", false))
 lmprof.set_option("output_string", options:Bool("output_string", "", false))
 lmprof.set_option("micro", options:Bool("micro", "", false))
+lmprof.set_option("compress_graph", options:Bool("compress_graph", "", true))
 lmprof.set_option("load_stack", options:Bool("load_stack", "", true))
 lmprof.set_option("mismatch", options:Bool("mismatch", "", false))
 lmprof.set_option("line_freq", options:Bool("line_freq", "", false))

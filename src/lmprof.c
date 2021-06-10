@@ -681,6 +681,8 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
     if (BITFIELD_TEST(st->conf, LMPROF_OPT_LOAD_STACK)) {
       int level = 0, last_line = 0;
       lu_addr last_fid = LMPROF_RECORD_ID_ROOT;
+      if (!callback_api && BITFIELD_TEST(st->conf, LMPROF_OPT_COMPRESS_GRAPH))
+        last_fid = record->r_id;
 
       /* Populate the thread with its current traceback. */
       for (level = lua_lastlevel(L); level >= 0; --level) {
@@ -706,7 +708,7 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
           lmprof_stack_measured_push(stack, record, &st->thread.r.s, istailcall);
         }
 
-        last_fid = fid;
+        last_fid = BITFIELD_TEST(st->conf, LMPROF_OPT_COMPRESS_GRAPH) ? fid : record->r_id;
         last_line = (debug.currentline >= 0) ? debug.currentline : 0;
       }
     }
@@ -1078,6 +1080,7 @@ EXTERN_OPT const char *const lmprof_option_strings[] = {
   "instructions",
   "load_stack",
   "mismatch",
+  "compress_graph",
   "verbose",
   "output_string",
   "line_freq",
@@ -1103,6 +1106,7 @@ EXTERN_OPT const uint32_t lmprof_option_codes[] = {
   LMPROF_OPT_INSTRUCTION_COUNT,
   LMPROF_OPT_LOAD_STACK,
   LMPROF_OPT_STACK_MISMATCH,
+  LMPROF_OPT_COMPRESS_GRAPH,
   LMPROF_OPT_REPORT_VERBOSE,
   LMPROF_OPT_REPORT_STRING,
   LMPROF_OPT_LINE_FREQUENCY,
@@ -1178,6 +1182,7 @@ LUALIB_API int lmprof_set_option(lua_State *L) {
     case LMPROF_OPT_CLOCK_MICRO:
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
+    case LMPROF_OPT_COMPRESS_GRAPH:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
@@ -1257,6 +1262,7 @@ LUALIB_API int lmprof_get_option(lua_State *L) {
     case LMPROF_OPT_CLOCK_MICRO:
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
+    case LMPROF_OPT_COMPRESS_GRAPH:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:

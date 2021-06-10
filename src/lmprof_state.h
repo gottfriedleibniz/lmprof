@@ -48,6 +48,7 @@
 #define LMPROF_OPT_INSTRUCTION_COUNT  0x8 /* Generate LUA_HOOKCOUNT events after the interpreter executes every count instructions */
 #define LMPROF_OPT_LOAD_STACK        0x10 /* Use 'lua_getstack' to populate a lmprof_Stack (with its traceback) on instantiation */
 #define LMPROF_OPT_STACK_MISMATCH    0x20 /* Allow start/stop to be called at different stack levels. */
+#define LMPROF_OPT_COMPRESS_GRAPH    0x40 /* p_id is defined by the parents f_id; otherwise the parents record id */
 
 #define LMPROF_OPT_REPORT_VERBOSE       0x1000 /* Include additional debug information */
 #define LMPROF_OPT_REPORT_STRING        0x2000 /* Output a formatted Lua string instead of an encoded table. */
@@ -68,9 +69,9 @@
 #define LMPROF_OPT_TRACE_THRESHOLD     0x80000000 /* Reversed: Trace event compression threshold */
 
 #if LUA_32BITS
-  #define LMPROF_OPT_DEFAULT (LMPROF_OPT_CLOCK_INIT | LMPROF_OPT_CLOCK_MICRO | LMPROF_OPT_LOAD_STACK)
+  #define LMPROF_OPT_DEFAULT (LMPROF_OPT_CLOCK_INIT | LMPROF_OPT_CLOCK_MICRO | LMPROF_OPT_LOAD_STACK | LMPROF_OPT_COMPRESS_GRAPH)
 #else
-  #define LMPROF_OPT_DEFAULT (LMPROF_OPT_CLOCK_INIT | LMPROF_OPT_LOAD_STACK)
+  #define LMPROF_OPT_DEFAULT (LMPROF_OPT_CLOCK_INIT | LMPROF_OPT_LOAD_STACK | LMPROF_OPT_COMPRESS_GRAPH)
 #endif
 
 /*

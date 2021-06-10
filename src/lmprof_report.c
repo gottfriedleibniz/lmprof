@@ -126,6 +126,7 @@ static int profiler_header(lua_State *L, lmprof_Report *R) {
     luaL_settabsb(L, "single_thread", BITFIELD_TEST(mode, LMPROF_MODE_SINGLE_THREAD));
     luaL_settabsb(L, "mismatch", BITFIELD_TEST(conf, LMPROF_OPT_STACK_MISMATCH));
     luaL_settabsb(L, "line_freq", BITFIELD_TEST(conf, LMPROF_OPT_LINE_FREQUENCY));
+    luaL_settabsb(L, "compress_graph", BITFIELD_TEST(conf, LMPROF_OPT_COMPRESS_GRAPH));
     luaL_settabsi(L, "sampler_count", l_cast(lua_Integer, st->i.mask_count));
     luaL_settabsi(L, "instr_count", l_cast(lua_Integer, st->i.instr_count));
     luaL_settabsi(L, "profile_overhead", l_cast(lua_Integer, LMPROF_TIME_ADJ(st->thread.r.overhead, conf)));
@@ -144,6 +145,7 @@ static int profiler_header(lua_State *L, lmprof_Report *R) {
     LMPROF_PRINTF(f, "single_thread = %s", indent, BITFIELD_TEST(mode, LMPROF_MODE_SINGLE_THREAD) ? "true" : "false");
     LMPROF_PRINTF(f, "mismatch = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_STACK_MISMATCH) ? "true" : "false");
     LMPROF_PRINTF(f, "line_freq = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_LINE_FREQUENCY) ? "true" : "false");
+    LMPROF_PRINTF(f, "compress_graph = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_COMPRESS_GRAPH) ? "true" : "false");
     LMPROF_PRINTF(f, "sampler_count = " LUA_INTEGER_FMT, indent, l_cast(lua_Integer, st->i.mask_count));
     LMPROF_PRINTF(f, "instr_count = " LUA_INTEGER_FMT, indent, l_cast(lua_Integer, st->i.instr_count));
     LMPROF_PRINTF(f, "profile_overhead = " LUA_INTEGER_FMT, indent, l_cast(lua_Integer, LMPROF_TIME_ADJ(st->thread.r.overhead, conf)));
@@ -165,6 +167,7 @@ static int profiler_header(lua_State *L, lmprof_Report *R) {
     luaL_addifstring(L, b, "single_thread = %s", indent, BITFIELD_TEST(mode, LMPROF_MODE_SINGLE_THREAD) ? "true" : "false");
     luaL_addifstring(L, b, "mismatch = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_STACK_MISMATCH) ? "true" : "false");
     luaL_addifstring(L, b, "line_freq = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_LINE_FREQUENCY) ? "true" : "false");
+    luaL_addifstring(L, b, "compress_graph = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_COMPRESS_GRAPH) ? "true" : "false");
     luaL_addifstring(L, b, "sampler_count = " LUA_INT_FORMAT, indent, LUA_INT_CAST(st->i.mask_count));
     luaL_addifstring(L, b, "instr_count = " LUA_INT_FORMAT, indent, LUA_INT_CAST(st->i.instr_count));
     luaL_addifstring(L, b, "profile_overhead = " LUA_INT_FORMAT, indent, LUA_INT_CAST(LMPROF_TIME_ADJ(st->thread.r.overhead, conf)));

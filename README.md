@@ -59,6 +59,14 @@ The exported API is broken down into four categories: **Configuration**, **Profi
 --      instantiation. Note, this option is closely related to mismatch.
 --    'line_freq' - Create a frequency list of line-executions for each profiled
 --      Lua function (graph instrumentation; requires "line" mode).
+--    'compress_graph' - When enabled a lmprof_Record instance will represent
+--      all activations of the same function, i.e., a function can have multiple
+--      parent records. Otherwise, each record represents a single function
+--      instance, i.e., a single parent/child relationship.
+--
+--      If the 'lines' mode is enabled, lmprof_Record instances will include
+--      line number of the callsite in the parent/child association. This option
+--      closely resembles the V8 CpuProfilingMode enumerated type
 --    'output_string' - Output a string representation of the formatted output.
 --        GRAPH - A Lua table; see '_G.load'
 --        TRACEEVENT - A formatted JSON string.
@@ -323,6 +331,7 @@ self = state:set_mode([...])
 local profiler = lmprof.create("instrument", "memory")
     :set_option("load_stack", true)
     :set_option("mismatch", true)
+    :set_option("compress_graph", true)
     :calibrate()
 
 -- Profile something; writing graph to 'something.out'
@@ -398,7 +407,7 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 ## Developer Notes
 
 ### Planned Features
-1. [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html) support. Refactoring line/call information for the graph API is required.
+1. [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html) support.
 1. [cpuprofile-fileformat](https://gperftools.github.io/gperftools/cpuprofile-fileformat.html) support.
 1. [perf.data](https://github.com/torvalds/linux/blob/master/tools/perf/Documentation/perf.data-file-format.txt) support.
 1. [DevTools Protocol](https://github.com/ChromeDevTools/devtools-protocol/blob/master/json/js_protocol.json) support, e.g., "ProfileNode" and other sampling features that can be mapped to Lua.
@@ -406,7 +415,6 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 ### TODO
 1. Refactor. See the note in the header of lmprof.c.
 1. Handle RDTSC reset and `lu_time` overflows (especially on 32bit builds).
-1. Include support for `<parent, function, line>` triples in [graph.lua](scripts/graph.lua). At the moment all records are compressed into the same graph node.
 1. Experiment with non-uniform sampling, e.g., dynamically estimate a `LUA_MASKCOUNT` value that estimates sampling
 uniformly in the 'time' domain (instead of instructions).
 1. Casting from uint64_t (time/size measurement counters) to lua_Integer creates potential down-casting issues: traceevent_adjust and OPT_CLOCK_MICRO exist as potential solutions.

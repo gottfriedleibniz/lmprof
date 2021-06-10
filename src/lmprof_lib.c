@@ -116,6 +116,9 @@ static void *alloc_hook(void *ud, void *ptr, size_t osize, size_t nsize) {
 ** ===================================================================
 */
 
+/* @HACK: Temporary helper macro for selecting 'parent' identifiers */
+#define P_ID(ST, R) BITFIELD_TEST((ST)->conf, LMPROF_OPT_COMPRESS_GRAPH) ? (R)->f_id : (R)->r_id
+
 /*
 ** Check for a 'stack mismatch', i.e., the function that invoked start() has
 ** left the profiler scope. The below logic must consider LMPROF_OPT_LOAD_STACK:
@@ -207,8 +210,8 @@ static int lmprof_sample_stack(lua_State *L, lmprof_State *st) {
   const int line_triples = BITFIELD_TEST(st->conf, LMPROF_OPT_LINE_FREQUENCY);
 
   /* Ensure the root has its count updated at least once. */
-  lu_addr last_fid = LMPROF_RECORD_ID_ROOT;
   lmprof_Record *record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_ROOT, LMPROF_RECORD_ID_ROOT, 0);
+  lu_addr last_fid = BITFIELD_TEST(st->conf, LMPROF_OPT_COMPRESS_GRAPH) ? LMPROF_RECORD_ID_ROOT : record->r_id;
   if (record->graph.count == 0)
     record->graph.count++;
 
@@ -239,7 +242,7 @@ static int lmprof_sample_stack(lua_State *L, lmprof_State *st) {
         }
       }
 
-      last_fid = fid;
+      last_fid = BITFIELD_TEST(st->conf, LMPROF_OPT_COMPRESS_GRAPH) ? fid : record->r_id;
       if (line_triples)
         last_line = (debug.currentline >= 0) ? debug.currentline : 0;
     }
@@ -291,7 +294,7 @@ static void graph_instrument(lua_State *L, lua_Debug *ar) {
       const lu_addr fid = lmprof_record_id(L, ar, BITFIELD_TEST(st->conf, LMPROF_OPT_GC_DISABLE), &result);
       if (!PROFILE_IS_STOP(result)) {
         const lmprof_StackInst *parent = lmprof_stack_peek(stack);
-        const lu_addr pid = (parent == l_nullptr) ? LMPROF_RECORD_ID_ROOT : parent->graph.record->f_id;
+        const lu_addr pid = (parent == l_nullptr) ? LMPROF_RECORD_ID_ROOT : P_ID(st, parent->graph.record);
         const int pid_lastLine = (parent == l_nullptr) ? 0 : parent->last_line;
 
         lmprof_Record *record = lmprof_fetch_record(L, st, ar, fid, pid, pid_lastLine);
@@ -1139,6 +1142,7 @@ static int state_getoption(lua_State *L) {
     case LMPROF_OPT_CLOCK_MICRO:
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
+    case LMPROF_OPT_COMPRESS_GRAPH:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
@@ -1191,6 +1195,7 @@ static int state_setoption(lua_State *L) {
     case LMPROF_OPT_CLOCK_MICRO:
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
+    case LMPROF_OPT_COMPRESS_GRAPH:
     case LMPROF_OPT_REPORT_VERBOSE:
     case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:

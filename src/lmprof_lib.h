@@ -8,7 +8,7 @@
 #include <lua.h>
 
 #define LMPROF_NAME "lmprof"
-#define LMPROF_VERSION "lmprof 0.1.6"
+#define LMPROF_VERSION "lmprof 0.1.7"
 #define LMPROF_COPYRIGHT "Copyright (C) 2021, Gottfried Leibniz"
 #define LMPROF_DESCRIPTION "A Lua Profiler"
 #if !defined(LUAMOD_API)
@@ -165,6 +165,14 @@ LUALIB_API int lmprof_profile_function(lua_State *L);
 **      instantiation. Note, this option is closely related to mismatch.
 **    'line_freq' - Create a frequency list of line-executions for each profiled
 **      Lua function (graph instrumentation; requires "line" mode).
+**    'compress_graph' - When enabled a lmprof_Record instance will represent
+**      all activations of the same function, i.e., a function can have multiple
+**      parent records. Otherwise, each record represents a single function
+**      instance, i.e., a single parent/child relationship.
+**
+**      If the 'lines' mode is enabled, lmprof_Record instances will include
+**      line number of the callsite in the parent/child association. This option
+**      closely resembles the V8 CpuProfilingMode enumerated type
 **    'output_string' - Output a string representation of the formatted output.
 **        GRAPH - A Lua table; see '_G.load'
 **        TRACEEVENT - A formatted JSON string.

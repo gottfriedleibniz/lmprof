@@ -787,10 +787,11 @@ static int stop_profiler(lua_State *L, lmprof_State *st, int file_idx) {
 }
 
 static int stack_object_profiler(lua_State *L, lmprof_State *active_state, int forcedMode, int forcedOpts, int state_idx, int args_top) {
+  lua_State *co;
   lmprof_State *st;
   const int file_idx = state_idx + 2;
   const int mode_idx = state_idx + 3;
-  luaL_checkstack(L, 3, __FUNCTION__);
+  luaL_checkstack(L, 6, __FUNCTION__);
 
   st = active_state;
   if (active_state == l_nullptr) {
@@ -807,19 +808,29 @@ static int stack_object_profiler(lua_State *L, lmprof_State *active_state, int f
     state_idx = lua_absindex(L, -2);
   }
 
-  if (lmprof_initialize_default(L, st, state_idx)) {
-    if (lua_pcall(L, 0, 0, 0) == LUA_OK) {
+  co = lua_newthread(L); /* [...[, state], object, thread] */
+  lua_pushvalue(L, state_idx);
+  lua_pushvalue(L, -3); /* [...[, state], object, thread, state, object] */
+  lua_xmove(L, co, 2); /* Move 'state' and object; [...[, state], object, thread] */
+
+  if (lmprof_initialize_default(co, st, lua_absindex(co, -2))) {
+    if (lua_pcall(co, 0, 0, 0) == LUA_OK) {
       const char *file = l_nullptr;
       const lmprof_ReportType type = report_type(L, st, file_idx, &file);
 
-      lmprof_finalize_profiler(L, st, 1);
-      lmprof_report(L, st, type, file);
+      lmprof_finalize_profiler(co, st, 1);
+      lmprof_report(co, st, type, file);
 
       /* If the profiler state was created in this function; destroy it. */
-      lmprof_shutdown_profiler(L, st);
+      lmprof_shutdown_profiler(co, st);
+
+      lua_remove(L, -2); /* Object */
       if (active_state == l_nullptr)
         lua_remove(L, -2); /* State */
 
+      lua_xmove(co, L, 1); /* Copy result back to original thread */
+      lua_remove(L, -2); /* Thread */
+      lmprof_clear_singleton(L);
       return 1;
     }
     else {

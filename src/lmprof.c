@@ -52,18 +52,6 @@ static int luaL_getsubtable(lua_State *L, int idx, const char *fname) {
 }
 #endif
 
-/* Clear the table on top of the Lua stack. */
-static void luaL_cleartable(lua_State *L) {
-  luaL_checkstack(L, 3, __FUNCTION__);
-  lua_pushnil(L); /* initial 'key' */
-  while (lua_next(L, -2) != 0) {
-    lua_pop(L, 1); /* removes 'value' from lua_next */
-    lua_pushvalue(L, -1); /* key */
-    lua_pushnil(L); /* value */
-    lua_rawset(L, -4); /* pop key & value */
-  }
-}
-
 /* Get a subtable within the registry table */
 static void lmprof_getlibtable(lua_State *L, lmprof_rawgeti_t name) {
   luaL_getsubtable(L, LUA_REGISTRYINDEX, LMPROF); /* [..., library_table] */
@@ -449,12 +437,26 @@ void lmprof_initialize_thread(lua_State *L, lmprof_State *st, lua_State *ignore)
 void lmprof_clear_thread(lua_State *L, lmprof_State *st, lua_State *ignore) {
   if (ignore != L && lua_gethook(L) == st->hook.l_hook) {
     /* Remove the profile stack associated with the given lua_State. */
-    luaL_checkstack(L, 4, __FUNCTION__);
+    luaL_checkstack(L, 5, __FUNCTION__);
     lmprof_getlibtable(L, LMPROF_TAB_THREAD_STACKS); /* [..., thread_stacks] */
+
+    /*
+    ** If the profiler stack is a light-userdata, manage that memory.
+    **
+    ** @NOTE Future-proofing for if/when allocated profiler stacks no longer
+    **  become managed by Lua.
+    */
     lua_pushthread(L); /* [..., thread_stacks, thread] */
-    lua_pushnil(L); /* [..., thread_stacks, thread, nil] */
-    lua_rawset(L, -3); /* [..., thread_stacks] */
-    lua_pop(L, 1);
+    lua_rawget(L, -2); /* [..., thread_stacks, stack] */
+    if (lua_islightuserdata(L, -1)) {
+      lmprof_Stack *stack = l_pcast(lmprof_Stack *, lua_touserdata(L, -1));
+      lmprof_stack_light_free(&st->hook.alloc, stack);
+    }
+
+    lua_pushthread(L); /* [..., thread_stacks, stack, thread] */
+    lua_pushnil(L); /* [..., thread_stacks, stack, thread, nil] */
+    lua_rawset(L, -4); /* [..., thread_stacks, stack] */
+    lua_pop(L, 2);
 
     lua_sethook(L, l_nullptr, 0, 0);
   }
@@ -478,8 +480,15 @@ void lmprof_clear_thread(lua_State *L, lmprof_State *st, lua_State *ignore) {
 /* Clear all threads and associated identifiers of 'dead' threads */
 static void lmprof_thread_info_gc(lua_State *L);
 
+/* Clear and deallocate all lua_State and profile stack associations. */
+static void lmprof_thread_stacktable_free(lua_State *L, int idx);
+
 /* Clear all lua_State and profile stack associations. */
-static void lmprof_thread_stacktable_clear(lua_State *L);
+static LUA_INLINE void lmprof_thread_stacktable_clear(lua_State *L) {
+  lmprof_getlibtable(L, LMPROF_TAB_THREAD_STACKS); /* [..., thread_stacks] */
+  lmprof_thread_stacktable_free(L, -1);
+  lua_pop(L, 1);
+}
 
 /* "debug.sethook" override when the profiler state is active. */
 static int sethook_error(lua_State *L) {
@@ -708,10 +717,29 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
   return stack;
 }
 
-void lmprof_thread_stacktable_clear(lua_State *L) {
-  lmprof_getlibtable(L, LMPROF_TAB_THREAD_STACKS); /* [..., thread_stacks] */
-  luaL_cleartable(L);
-  lua_pop(L, 1);
+void lmprof_thread_stacktable_free(lua_State *L, int idx) {
+  const int t_idx = lua_absindex(L, idx);
+
+  lmprof_Alloc l_alloc;
+  l_alloc.f = lua_getallocf(L, &l_alloc.ud);
+
+  luaL_checkstack(L, 5, __FUNCTION__);
+  lua_pushnil(L); /* [..., key] */
+  while (lua_next(L, t_idx) != 0) { /* [..., key, value] */
+    /*
+    ** @NOTE Future-proofing for if/when allocated profiler stacks no longer
+    **  become managed by Lua.
+    */
+    if (lua_islightuserdata(L, -1)) {
+      lmprof_Stack *stack = l_pcast(lmprof_Stack *, lua_touserdata(L, -1));
+      lmprof_stack_light_free(&l_alloc, stack);
+    }
+
+    lua_pop(L, 1); /* [table, key] */
+    lua_pushvalue(L, -1); /* [table, key, key] */
+    lua_pushnil(L); /* [table, key, key, nil] */
+    lua_rawset(L, -4); /* [table, key] */
+  }
 }
 
 lua_Integer lmprof_thread_identifier(lua_State *L) {

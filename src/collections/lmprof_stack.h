@@ -55,6 +55,12 @@ typedef struct lmprof_Stack {
 /* Creates and pushes on the stack a new lmprof_Stack full-userdata. */
 LUA_API lmprof_Stack *lmprof_stack_new(lua_State *L, lua_Integer id, char callback_api);
 
+/* Allocate a lmprof_Stack instance; intended to be used as a Lua light userdata. */
+LUA_API lmprof_Stack *lmprof_stack_light_new(lmprof_Alloc *alloc, lua_Integer id, char callback_api);
+
+/* Free an allocated lmprof_Stack (light userdata) instance. */
+LUA_API void lmprof_stack_light_free(lmprof_Alloc *alloc, lmprof_Stack *stack);
+
 /* Removes and sanitizes (stack_clear_instance) all stack instances from the Stack. */
 LUA_API void lmprof_stack_clear(lmprof_Stack *s);
 

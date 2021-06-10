@@ -40,6 +40,15 @@ LUA_API lmprof_Stack *lmprof_stack_new(lua_State *L, lua_Integer id, char callba
   return setup_stack(s, id, callback_api);
 }
 
+LUA_API lmprof_Stack *lmprof_stack_light_new(lmprof_Alloc *alloc, lua_Integer id, char callback_api) {
+  lmprof_Stack *s = l_pcast(lmprof_Stack *, lmprof_malloc(alloc, LMPROF_STACK_SIZE));
+  return setup_stack(s, id, callback_api);
+}
+
+LUA_API void lmprof_stack_light_free(lmprof_Alloc *alloc, lmprof_Stack *stack) {
+  lmprof_free(alloc, l_pcast(void *, stack), LMPROF_STACK_SIZE);
+}
+
 LUA_API void lmprof_stack_clear(lmprof_Stack *s) {
   size_t i;
   s->head = 0;

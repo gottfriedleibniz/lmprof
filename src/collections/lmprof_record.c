@@ -589,6 +589,8 @@ LUA_API void lmprof_record_update(lua_State *L, lmprof_Alloc *alloc, lua_Debug *
       info->srclen = len;
 #endif
       info->i_ci = LUA_CALLINFO_NULL;
+      if (f_id == LMPROF_RECORD_ID_ROOT)
+        BITFIELD_SET(info->event, LMPROF_RECORD_ROOT);
     }
     else {
       lmprof_record_populate(L, alloc, ar, info);

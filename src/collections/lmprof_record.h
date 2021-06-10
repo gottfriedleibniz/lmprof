@@ -35,8 +35,9 @@
 ** with the corresponding flags:
 */
 #define LMPROF_RECORD_USERDATA         0x1 /* Allocated as userdata; memory management not required */
-#define LMPROF_RECORD_CCLOSURE         0x2 /* Recored represents a C Closure */
-#define LMPROF_RECORD_IGNORED          0x4 /* Registered as 'ignored' */
+#define LMPROF_RECORD_ROOT             0x2 /* TraceEvent has '__metaProcess'; do not report root records */
+#define LMPROF_RECORD_CCLOSURE         0x4 /* Recored represents a C Closure */
+#define LMPROF_RECORD_IGNORED          0x8 /* Registered as 'ignored' */
 #define LMPROF_RECORD_REPORTED  0x80000000 /* A callgrind specific flag to enable name compression */
 
 /* Record userdata metatable */

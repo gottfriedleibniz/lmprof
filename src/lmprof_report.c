@@ -884,7 +884,7 @@ static void traceevent_table_events(lua_State *L, lmprof_Report *R, TraceEventTi
       TraceEvent *event = &page->event_array[i];
       TraceEventType op = event->op;
       if (op == ENTER_SCOPE || op == EXIT_SCOPE) {
-        if (BITFIELD_TEST(event->data.event.info->event, LMPROF_RECORD_IGNORED))
+        if (BITFIELD_TEST(event->data.event.info->event, LMPROF_RECORD_IGNORED | LMPROF_RECORD_ROOT))
           op = IGNORE_SCOPE; /* Function "ignored" during profiling */
       }
 

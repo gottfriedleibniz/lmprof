@@ -85,14 +85,14 @@
 #if defined(LMPROF_RDTSC) || defined(LMPROF_RDTSCP)
   #define LUA_TIME lmprof_clock_rdtsc
 
-  #define LMPROF_TIME(S) LUA_TIME()
+  #define LMPROF_TIME(S) (S)->time()
   #define LMPROF_TIME_ID(O) (((O) & LMPROF_OPT_CLOCK_MICRO) ? "Krdtsc" : "rdtsc")
   #define LMPROF_TIME_ADJ(T, F) (((F) & LMPROF_OPT_CLOCK_MICRO) ? ((T) / 1000) : (T))
 #else
   /* Format the time 'T' according to the profile configuration flags 'F' */
   #define LUA_TIME lmprof_clock_sample
 
-  #define LMPROF_TIME(S) LUA_TIME()
+  #define LMPROF_TIME(S) (S)->time()
   #if LUA_32BITS
     #define LMPROF_TIME_ID(O) "micro"
     #define LMPROF_TIME_ADJ(T, F) LU_TIME_MICRO(T)
@@ -105,6 +105,9 @@
 /* Profiler definition. */
 typedef struct lmprof_State lmprof_State;
 typedef struct lmprof_StackInst lmprof_StateInst;
+
+/* Timer hook */
+typedef lu_time (*lmprof_Time)(void);
 
 /* Resource disposal and error handling */
 typedef void (*lmprof_Error)(lua_State *, lmprof_State *);
@@ -138,6 +141,7 @@ struct lmprof_State {
   uint32_t mode; /* profiling flags */
   uint32_t conf; /* configuration flags */
   uint32_t state; /* state flags */
+  lmprof_Time time;
   lmprof_Error on_error; /* error/invalid state handler */
 
   /* lua_sethook configuration. */

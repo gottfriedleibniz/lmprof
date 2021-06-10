@@ -271,6 +271,7 @@ int lmprof_error(lua_State *L, lmprof_State *st, const char *fmt, ...) {
 }
 
 int lmprof_initialize_state(lua_State *L, lmprof_State *st, uint32_t mode, lmprof_Error error) {
+  st->time = LUA_TIME;
   st->on_error = error;
   st->mode = mode;
   st->conf = 0;
@@ -656,7 +657,7 @@ static void lmprof_trace_gc_event(lua_State *L, lmprof_State *st, int begin_gc) 
     int lmprof_errno = LUA_OK;
     lmprof_StackInst *inst = l_nullptr;
 
-    st->thread.r.s.time = LUA_TIME();
+    st->thread.r.s.time = LMPROF_TIME(st);
     if (begin_gc) {
       lmprof_Record *record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_GC, LMPROF_RECORD_ID_ROOT, 0);
 

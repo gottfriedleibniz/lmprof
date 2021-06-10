@@ -419,7 +419,6 @@ Ordered by priority.
 1. Experiment with non-uniform sampling, e.g., dynamically estimate a `LUA_MASKCOUNT` value that estimates sampling uniformly in the 'time' domain (instead of instructions). An alternative approach would to use OS-specific timers/signals to inform when sampling should occur (similar to LuaJIT).
 1. Casting from uint64_t (time/size measurement counters) to lua_Integer creates potential down-casting issues: traceevent_adjust and OPT_CLOCK_MICRO exist as potential solutions.
 1. Path-based `lmprof.ignore`: ignore the instrumentation of a function and all of its descendants.
-1. `LUA_TIME` hook: allow timer function overrides.
 1. Encoded screenshot support: a Lua table (or another simple linked pager) of base64 encoded strings with optional limits on the amount of data that can be buffered.
 
 ## Sources & Acknowledgments:

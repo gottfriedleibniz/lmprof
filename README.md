@@ -182,51 +182,36 @@ value = lmprof.has_io()
 --
 state = lmprof.start(...)
 
--- stop([output_path]): Stop the profiler singleton and build its results. If no
---  output_path is supplied a formatted Lua table or string is returned.
---  Otherwise, the success of the IO (true/false) is returned.
+-- stop(): Stop the profiler singleton and build its results. Returning a
+--  formatted Lua table or string; nil on failure.
 --
 --  lmprof_report.h contains the specifications for the different "result"
 --  structures depending on the profile mode.
---
---  output_path - a file-path string where the formatted results are written.
---    For 'graph' profiling, the generated output is a Lua compatible table that
---    can be loaded with 'require' or 'dofile'. Meanwhile, 'trace' profiling
---    will generate a JSON file.
---
--- *NOTE*: output_path requires LMPROF_FILE_API to be enabled (see 'has_io').
-result = lmprof.stop([output_path])
+result = lmprof.stop()
 
 -- quit(): Preempt any active profiler state without reporting its results.
 lmprof.quit()
 
 -- Additional profiling inputs.
 --
--- lmprof_profile_X(input, output_path, ...): Profile the 'input' the object.
--- Placing the result of the profiling (see lmprof_stop) onto the stack. Note,
--- all trailing arguments correspond to its mode (see lmprof_start).
---
---  output_path - Optional filepath to write formatted results, see 'stop'. All
---    other arguments correspond to its mode. This function require an explicit
---    'nil' output_path parameter to denote the result is to be returned as a
---    Lua object.
---
--- *NOTE*: output_path requires LMPROF_FILE_API to be enabled (see 'has_io').
+-- lmprof_profile_X(input, ...): Profile the 'input' the object. Placing the
+-- result of the profiling (see lmprof_stop) onto the stack. Note, all trailing
+-- arguments correspond to its mode (see lmprof_start).
 
--- file(input_path, output_path, ...):
+-- file(input_path, ...):
 --
--- Profile the script at the given path.
-result = lmprof.file(input_path, output_path, ...)
+-- Will throw a "luaL_loadfile not supported" error.
+result = lmprof.file(input_path, ...)
 
--- string(input, output_path, ...):
+-- string(input, ...):
 --
 -- Profile the given input script (loading with luaL_loadstring).
-result = lmprof.string(input, output_path, ...)
+result = lmprof.string(input, ...)
 
--- func(input, output_path, ...):
+-- func(input, ...):
 --
 -- profile the given function argument (invoking with lua_pcall).
-result = lmprof.func(input, output_path, ...)
+result = lmprof.func(input, ...)
 ```
 
 ### Miscellaneous
@@ -285,7 +270,7 @@ state = lmprof.create(...)
 self = state:start()
 
 -- stop: See lmprof.stop()
-result = state:stop([output_path])
+result = state:stop()
 
 -- quit: See lmprof.quit()
 state:quit()
@@ -297,13 +282,13 @@ value = state:get_option(option)
 self = state:set_option(option, value)
 
 -- See lmprof.file
-result = state:file(input_path[, output_path], ...)
+result = state:file(input_path, ...)
 
 -- See lmprof.string
-result = state:string(input[, output_path], ...)
+result = state:string(input, ...)
 
 -- See lmprof.func
-result = state:func(input[, output_path], ...)
+result = state:func(input, ...)
 
 -- See lmprof.begin_frame()
 self = state:begin_frame()

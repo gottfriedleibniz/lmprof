@@ -138,6 +138,8 @@ static int pushglobalfuncname(lua_State *L, lua_Debug *ar) {
 /* SOURCE: lauxlib.c */
 static const char *getfuncinfo(lua_State *L, lua_Debug *ar, size_t *len) {
   const int top = lua_gettop(L);
+  if (ar->name == l_nullptr)
+    lua_getinfo(L, DEBUG_NAME, ar);
 
   /*
   ** It is assumed the passed lua_Debug is already populated. Avoid the spurious
@@ -379,7 +381,10 @@ LUA_API lu_addr lmprof_record_id(lua_State *L, lua_Debug *ar, int gc_disabled, l
     const TValue *o = s2v(LUA_CALLINFO(L, ar->i_ci)->func);
     lua_assert(ttisfunction(o));
 
-    lua_getinfo(L, DEBUG_IMMUTABLE, ar);
+    lua_getinfo(L, DEBUG_IMMUTABLE_NO_NAME, ar);
+    ar->namewhat = "";
+    ar->name = l_nullptr;
+
   #if LUA_VERSION_NUM == 501
     if (clvalue(o)->c.isC) {
       function = l_pcast(lu_addr, clvalue(o)->c.f);
@@ -435,7 +440,10 @@ LUA_API lu_addr lmprof_record_id(lua_State *L, lua_Debug *ar, int gc_disabled, l
   #endif
   }
 
-  lua_getinfo(L, DEBUG_FUNCTION DEBUG_IMMUTABLE, ar); /* [..., function] */
+  lua_getinfo(L, DEBUG_FUNCTION DEBUG_IMMUTABLE_NO_NAME, ar); /* [..., function] */
+  ar->namewhat = "";
+  ar->name = l_nullptr;
+
   cfunction = lua_tocfunction(L, -1);
   if (cfunction != l_nullptr) {
     function = l_pcast(lu_addr, cfunction);
@@ -473,6 +481,7 @@ LUA_API lu_addr lmprof_record_id(lua_State *L, lua_Debug *ar, int gc_disabled, l
   */
   else {
     const char *name = LMPROF_RECORD_NAME_UNKNOWN;
+    lua_getinfo(L, DEBUG_NAME, ar);
     if (*(ar->what) != '\0') /* is there a name? */
       name = ar->name == l_nullptr ? ar->what : ar->name;
 
@@ -566,7 +575,7 @@ LUA_API void lmprof_record_update(lua_State *L, lmprof_Alloc *alloc, lua_Debug *
     l_nullptr
   };
 
-  if (info->name == l_nullptr && !BITFIELD_TEST(info->event, LMPROF_RECORD_IGNORED)) {
+  if (!LMPROF_RECORD_HAS_NAME(info)) {
     if (ar == l_nullptr) { /* Ensure "synthetic" activation record is initialized */
       const char *name = reserved_identifiers[l_cast(int, f_id)];
       const size_t len = strlen(name);

@@ -901,7 +901,8 @@ LUALIB_API int lmprof_get_name(lua_State *L) {
 */
 lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar, lu_addr fid, lu_addr pid, int p_currentline) {
   lmprof_Record *record;
-  if ((record = lmprof_hash_get(st->i.hash, fid, pid, p_currentline)) == l_nullptr) {
+  lmprof_Hash *hash = st->i.hash;
+  if ((record = lmprof_hash_get(hash, fid, pid, p_currentline)) == l_nullptr) {
     /*
     ** Create a debugging record (formatted details) if current <function, parent>
     ** tuple does not exist in the hash table.
@@ -919,7 +920,7 @@ lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar
     record->p_currentline = p_currentline;
 
     lmprof_record_update(L, &st->hook.alloc, ar, fid, &record->info);
-    if (!lmprof_hash_insert(&st->hook.alloc, st->i.hash, record)) {
+    if (!lmprof_hash_insert(&st->hook.alloc, hash, record)) {
       lmprof_record_clear(&st->hook.alloc, record); /* ensure new record is free'd */
       lmprof_error(L, st, "lmprof_hash_insert error");
       return l_nullptr;

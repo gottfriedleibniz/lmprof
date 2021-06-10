@@ -19,10 +19,13 @@
 /* Available lua_getinfo flags that *do not* push objects onto the stack. */
 #if LUA_VERSION_NUM == 501
   #define DEBUG_IMMUTABLE "lnSu"
+  #define DEBUG_IMMUTABLE_NO_NAME "lSu"
 #elif LUA_VERSION_NUM == 502 || LUA_VERSION_NUM == 503
   #define DEBUG_IMMUTABLE "lnSut"
+  #define DEBUG_IMMUTABLE_NO_NAME "lSut"
 #elif LUA_VERSION_NUM == 504
   #define DEBUG_IMMUTABLE "lnSutr"
+  #define DEBUG_IMMUTABLE_NO_NAME "lSutr"
 #else
   #error unsupported Lua version
 #endif
@@ -41,6 +44,7 @@
 
 /* Helper for sanitizing names */
 #define LMPROF_RECORD_NAME(n, o) (((n) == l_nullptr) ? (o) : (n))
+#define LMPROF_RECORD_HAS_NAME(I) ((I)->name != l_nullptr || BITFIELD_TEST((I)->event, LMPROF_RECORD_IGNORED))
 
 /*
 ** An extension of lua_Debug (re-purposing the struct for simplicity) for shared

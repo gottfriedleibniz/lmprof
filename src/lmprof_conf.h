@@ -91,10 +91,12 @@ LUA_EXTERN_END
   typedef uintptr_t lu_addr;
   typedef uint64_t lu_time;
   typedef size_t lu_size;
+  typedef ptrdiff_t lu_sizediff;
 
   #define PRIluADDR PRIxPTR
   #define PRIluTIME PRIu64
   #define PRIluSIZE "zu"
+  #define PRIluSIZEDIFF "td"
 
   /* Time conversions. */
   #define LU_TIME_NANO(T) ((T))
@@ -104,10 +106,12 @@ LUA_EXTERN_END
   typedef size_t lu_addr;
   typedef size_t lu_time;
   typedef size_t lu_size;
+  typedef ptrdiff_t lu_sizediff;
 
   #define PRIluADDR "zu"
   #define PRIluTIME "zu"
   #define PRIluSIZE "zu"
+  #define PRIluSIZEDIFF "td"
 
   #define LU_TIME_NANO(T) ((T)*1000)
   #define LU_TIME_MICRO(T) ((T))

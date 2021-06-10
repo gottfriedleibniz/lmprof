@@ -8,7 +8,7 @@
 #include <lua.h>
 
 #define LMPROF_NAME "lmprof"
-#define LMPROF_VERSION "lmprof 0.1.12"
+#define LMPROF_VERSION "lmprof 0.1.13"
 #define LMPROF_COPYRIGHT "Copyright (C) 2021, Gottfried Leibniz"
 #define LMPROF_DESCRIPTION "A Lua Profiler"
 #if !defined(LUAMOD_API)

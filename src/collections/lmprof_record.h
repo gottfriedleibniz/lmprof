@@ -104,8 +104,22 @@ static LUA_INLINE void unit_sub(lmprof_EventUnit *dest, const lmprof_EventUnit *
 ** Compute the total number of allocated bytes; returning zero if more bytes
 ** have been deallocated than allocated.
 */
-static LUA_INLINE lu_size unit_allocated(const lmprof_EventUnit *u) {
+static LUA_INLINE lu_sizediff unit_allocated(const lmprof_EventUnit *u) {
+  /*
+  * Data allocated before the profiler began was GC'd while profiling, causing
+  * deallocated to be greater than allocated.
+  *
+  * Assume (or hope?) this profiler will never track enough runtime allocations
+  * to cause overflow issues. 32-bit compiles will keep previous functionality
+  * until 32-bit builds are focused on more.
+  */
+#if LUA_32BITS
   return (u->deallocated > u->allocated) ? 0 : (u->allocated - u->deallocated);
+#else
+  if (u->deallocated > u->allocated)
+    return -l_cast(lu_sizediff, u->deallocated - u->allocated);
+  return l_cast(lu_sizediff, u->allocated - u->deallocated);
+#endif
 }
 
 /*

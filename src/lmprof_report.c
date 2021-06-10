@@ -1143,7 +1143,7 @@ static int __eventUpdateCounters(lua_State *L, lmprof_Report *R, const TraceEven
     fprintf(f, JSON_DELIM JSON_ASSIGN("ts", "%" PRIluTIME ""), LMPROF_TIME_ADJ(event->call.s.time, R->st->conf));
     fprintf(f, JSON_DELIM JSON_ASSIGN("args", JSON_OPEN_OBJ));
     fprintf(f, JSON_ASSIGN("data", JSON_OPEN_OBJ));
-    fprintf(f, JSON_ASSIGN("jsHeapSizeUsed", "%" PRIluSIZE), unit_allocated(&event->call.s));
+    fprintf(f, JSON_ASSIGN("jsHeapSizeUsed", "%" PRIluSIZEDIFF), unit_allocated(&event->call.s));
     fprintf(f, JSON_CLOSE_OBJ);
     fprintf(f, JSON_CLOSE_OBJ);
     fprintf(f, JSON_CLOSE_OBJ);
@@ -1159,7 +1159,7 @@ static int __eventUpdateCounters(lua_State *L, lmprof_Report *R, const TraceEven
     char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
     if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
       LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
-    if (snprintf(hs_str, sizeof(hs_str), "%" PRIluSIZE "", unit_allocated(&event->call.s)) < 0)
+    if (snprintf(hs_str, sizeof(hs_str), "%" PRIluSIZEDIFF "", unit_allocated(&event->call.s)) < 0)
       LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
 
     REPORT_ENSURE_BUFFER_DELIM(R);

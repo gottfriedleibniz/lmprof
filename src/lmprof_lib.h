@@ -8,7 +8,7 @@
 #include <lua.h>
 
 #define LMPROF_NAME "lmprof"
-#define LMPROF_VERSION "lmprof 0.1.0"
+#define LMPROF_VERSION "lmprof 0.1.1"
 #define LMPROF_COPYRIGHT "Copyright (C) 2021, Gottfried Leibniz"
 #define LMPROF_DESCRIPTION "A Lua Profiler"
 #if !defined(LUAMOD_API)
@@ -82,8 +82,11 @@ LUALIB_API int lmprof_create(lua_State *L);
 **    whenever it is about to start the execution of a new line of code, or when
 **    it jumps back in the code.
 **
-**    GRAPH: When 'line_freq' is enabled: each aggregated activation records a
-**      line-execution frequency list (presuming the record is a Lua function).
+**    GRAPH: 'Aggregated' activation records are formed by hashing a
+**                <function_id, parent_id, parent_line>
+**      triple. When the 'line_freq' option is enabled: each aggregated
+**      activation will also record a line-execution frequency list (presuming
+**      the record is a Lua function).
 **
 **    TRACE: Generates additional timeline events. Note, this function should
 **      never be enabled.

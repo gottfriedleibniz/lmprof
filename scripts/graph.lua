@@ -17,6 +17,7 @@
     fields related to formatting and output of the graph:
         [BOOLEAN]
         csv - "Flat" layout is comma delimited [BOOLEAN]
+        show_lines - Show line frequencies for flat output
 
         [STRING]
         sort - Sort the LMGraph output by a given category:
@@ -152,7 +153,7 @@ Decimal = {
     A function node that represents:
 
     (1) A single 'aggregated' activation record instance, e.g., a <func, parent>
-        tuple.
+        tuple or <func, parent, parent_line> triple.
 
     (2) The accumulated statistics of all instances of the same function, its
         sources of invocation (parents), and decadents (children).
@@ -176,6 +177,7 @@ LMNode = setmetatable({
         total_allocated = { Label = "Total", Cat = "Binary", Sort = function(fa, fb) return fa.total_allocated - fb.total_allocated end },
         deallocated = { Label = "Dealloc", Cat = "Binary" },
         total_deallocated = { Label = "Dealloc", Cat = "Binary" },
+        lines = { Label = "Lines", Cat = "Table" },
 
         -- Extended fields
         timePerCount = { Label = "Time/Call", Cat = "TimeAverage" },
@@ -237,6 +239,11 @@ function LMNode.New(id, record, previous)
         result.childSizePercent = 0.0
     end
 
+    -- Line Frequency
+    if record ~= nil and record.lines ~= nil then
+        result.lines = { }
+    end
+
     return result
 end
 
@@ -280,6 +287,18 @@ function LMNode:Append(header, record, parentNode)
         if self.allocated then
             self.allocated = self.allocated + record.allocated
             self.deallocated = self.deallocated + record.deallocated
+        end
+    end
+
+    -- If line_freq was enabled, combine frequencies
+    if record.lines ~= nil then
+        local funcLines = self.lines
+        for i=1,#record.lines do
+            if funcLines[i] ~= nil then
+                funcLines[i] = funcLines[i] + record.lines[i]
+            else
+                funcLines[i] = record.lines[i]
+            end
         end
     end
 end
@@ -578,7 +597,10 @@ function LMGraph:Flat(header, outfile)
         if funcNode.record ~= nil then
             functions[#functions + 1] = f
             for j=#flatColumns,1,-1 do
-                if funcNode[flatColumns[j]] == nil then
+                local field = LMNode.Fields[flatColumns[j]]
+                if field.Cat ~= "Table" and funcNode[flatColumns[j]] == nil then
+                    table.remove(flatColumns, j)
+                elseif field.Cat == "Table" and not header.show_lines then
                     table.remove(flatColumns, j)
                 end
             end
@@ -608,6 +630,9 @@ function LMGraph:Flat(header, outfile)
                 row[j] = Binary.Format(value, bytePerDegree)
             elseif field.Cat == "Percent" then
                 row[j] = ("%1.3f"):format(value)
+            elseif field.Cat == "Table" then
+                local concat = table.concat(value or { }, ", ")
+                row[j] = (header.csv and ("\"%s\""):format(concat)) or concat
             elseif header.csv and field.Cat == "String" then
                 row[j] = ("\"%s\""):format(value)
             else

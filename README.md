@@ -153,8 +153,11 @@ value = lmprof.has_io()
 --    whenever it is about to start the execution of a new line of code, or when
 --    it jumps back in the code.
 --
---    GRAPH: When 'line_freq' is enabled: each aggregated activation records a
---      line-execution frequency list (presuming the record is a Lua function).
+--    GRAPH: 'Aggregated' activation records are formed by hashing a
+--                <function_id, parent_id, parent_line>
+--      triple. When the 'line_freq' option is enabled: each aggregated
+--      activation will also record a line-execution frequency list (presuming
+--      the record is a Lua function).
 --
 --    TRACE: Generates additional timeline events. Note, this function should
 --      never be enabled.
@@ -397,7 +400,9 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 1. [DevTools Protocol](https://github.com/ChromeDevTools/devtools-protocol/blob/master/json/js_protocol.json) support, e.g., "ProfileNode" and other sampling features that can be mapped to Lua.
 
 ### TODO
+1. Refactor. See the note in the header of lmprof.c.
 1. Handle RDTSC reset and `lu_time` overflows (especially on 32bit builds).
+1. Include support for `<parent, function, line>` triples in [graph.lua](scripts/graph.lua). At the moment all records are compressed into the same graph node.
 1. Experiment with non-uniform sampling, e.g., dynamically estimate a `LUA_MASKCOUNT` value that estimates sampling
 uniformly in the 'time' domain (instead of instructions).
 1. Casting from uint64_t (time/size measurement counters) to lua_Integer creates potential down-casting issues: traceevent_adjust and OPT_CLOCK_MICRO exist as potential solutions.

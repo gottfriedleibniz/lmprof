@@ -202,12 +202,13 @@ static LUA_INLINE lmprof_State *graph_prehook(lua_State *L) {
 **  until lua_getstack fails.
 */
 static int lmprof_sample_stack(lua_State *L, lmprof_State *st) {
-  int level;
+  int level, last_line = 0;
   const int gc_disabled = BITFIELD_TEST(st->conf, LMPROF_OPT_GC_DISABLE);
+  const int line_triples = BITFIELD_TEST(st->conf, LMPROF_OPT_LINE_FREQUENCY);
 
   /* Ensure the root has its count updated at least once. */
   lu_addr last_fid = LMPROF_RECORD_ID_ROOT;
-  lmprof_Record *record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_ROOT, LMPROF_RECORD_ID_ROOT);
+  lmprof_Record *record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_ROOT, LMPROF_RECORD_ID_ROOT, 0);
   if (record->graph.count == 0)
     record->graph.count++;
 
@@ -225,7 +226,7 @@ static int lmprof_sample_stack(lua_State *L, lmprof_State *st) {
       */
 
       /* Update function counts */
-      record = lmprof_fetch_record(L, st, &debug, fid, last_fid);
+      record = lmprof_fetch_record(L, st, &debug, fid, last_fid, last_line);
       if (level == 0 || (level > 0 && record->graph.count == 0))
         record->graph.count++;
 
@@ -239,6 +240,8 @@ static int lmprof_sample_stack(lua_State *L, lmprof_State *st) {
       }
 
       last_fid = fid;
+      if (line_triples)
+        last_line = (debug.currentline >= 0) ? debug.currentline : 0;
     }
     else {
       LMPROF_LOG("%s lua_getstack failure!", __FUNCTION__);
@@ -289,8 +292,9 @@ static void graph_instrument(lua_State *L, lua_Debug *ar) {
       if (!PROFILE_IS_STOP(result)) {
         const lmprof_StackInst *parent = lmprof_stack_peek(stack);
         const lu_addr pid = (parent == l_nullptr) ? LMPROF_RECORD_ID_ROOT : parent->graph.record->f_id;
+        const int pid_lastLine = (parent == l_nullptr) ? 0 : parent->last_line;
 
-        lmprof_Record *record = lmprof_fetch_record(L, st, ar, fid, pid);
+        lmprof_Record *record = lmprof_fetch_record(L, st, ar, fid, pid, pid_lastLine);
         lmprof_StackInst *inst = lmprof_stack_measured_push(stack, record, &st->thread.r.s, LUA_IS_TAILCALL(ar));
         if (inst == l_nullptr) {
           lmprof_error(L, st, "profiler stack overflow");
@@ -522,7 +526,7 @@ static void traceevent_instrument(lua_State *L, lua_Debug *ar) {
         const lmprof_StackInst *parent = lmprof_stack_peek(stack);
         const lu_addr pid = (parent == l_nullptr) ? LMPROF_RECORD_ID_ROOT : parent->graph.record->f_id;
 
-        lmprof_Record *record = lmprof_fetch_record(L, st, ar, fid, pid);
+        lmprof_Record *record = lmprof_fetch_record(L, st, ar, fid, pid, 0);
         lmprof_StackInst *inst = lmprof_stack_event_push(stack, record, &st->thread.r, LUA_IS_TAILCALL(ar));
         if (inst == l_nullptr) {
           lmprof_error(L, st, "profiler stack overflow");

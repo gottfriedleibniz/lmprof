@@ -151,6 +151,7 @@ static int graph_hash_callback(lua_State *L, lmprof_Record *record, void *args) 
     luaL_settabss(L, "id", rid_str);
     luaL_settabss(L, "func", fid_str);
     luaL_settabss(L, "parent", pid_str);
+    luaL_settabsi(L, "parent_line", l_cast(lua_Integer, record->p_currentline));
     luaL_settabsb(L, "ignored", BITFIELD_TEST(info->event, LMPROF_RECORD_IGNORED));
     luaL_settabss(L, "name", (info->name == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->name);
     luaL_settabss(L, "what", (info->what == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->what);
@@ -220,6 +221,7 @@ static int graph_hash_callback(lua_State *L, lmprof_Record *record, void *args) 
     LMPROF_PRINTF(f, "id = \"%" PRIluADDR "\"", indent, record->r_id);
     LMPROF_PRINTF(f, "func = \"%" PRIluADDR "\"", indent, record->f_id);
     LMPROF_PRINTF(f, "parent = \"%" PRIluADDR "\"", indent, record->p_id);
+    LMPROF_PRINTF(f, "parent_line = %d", indent, record->p_currentline);
     LMPROF_PRINTF(f, "ignored = %s", indent, BITFIELD_TEST(info->event, LMPROF_RECORD_IGNORED) ? "true" : "false");
     LMPROF_PRINTF(f, "name = \"%s\"", indent, (info->name == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->name);
     LMPROF_PRINTF(f, "what = \"%s\"", indent, (info->what == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->what);

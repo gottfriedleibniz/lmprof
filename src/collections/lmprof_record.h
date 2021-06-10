@@ -59,6 +59,7 @@ typedef struct lmprof_Record {
   lu_addr r_id; /* global record identifier (a unique value) */
   lu_addr f_id; /* address/identifier of function */
   lu_addr p_id; /* address/identifier of parent */
+  int p_currentline; /* parent callsite information */
   lmprof_FunctionInfo info;
 
   /* Additional statistics for each profiling configuration. */

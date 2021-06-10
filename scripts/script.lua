@@ -20,7 +20,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
   [-t | --time] [-m | --memory] [-e | --trace] [-l | --lines] [-s | --sample] [--single_thread]
   [--micro] [--load_stack] [--mismatch] [--line_freq] [--ignore_yield] [-g | --disable_gc] [-i | --instructions]
   [-p | --process] [-f | --draw_frame] [-c | --compress] [--split] [--tracing] [--page_limit] [--name] [--url]
-  [--pepper] [--json] [--sort] [--csv] [-v | --verbose]
+  [--pepper] [--json] [--sort] [--csv] [--show_lines] [-v | --verbose]
 
 [INPUT]
   --input: input script file
@@ -67,6 +67,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
     --json: Write 'base' profiling output as formatted JSON.
     --sort: result sorting algorithm [count, size, time] (optional, default: count)
     --csv: Comma-separated flat output
+    --show_lines: Show line frequencies in generated output.
     --verbose: Output debug/verbose strings
 ]]
 
@@ -233,6 +234,10 @@ else
 
     result.header.sort = options:String("sort", "", nil)
     result.header.csv = options:Bool("csv", "", false)
+    result.header.show_lines = options:Bool("show_lines", "", false)
+    if line_mode and options:Bool("line_freq", "", false) then
+        result.header.show_lines = true
+    end
 
     local graph = Graph(result.header, result.records)
     if output == nil and options:Bool("verbose", "v", false) then

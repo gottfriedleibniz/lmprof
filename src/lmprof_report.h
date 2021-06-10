@@ -58,6 +58,8 @@
 **    id - unique global identifier.
 **    func - function identifier.
 **    parent - parent function identifier.
+**    parent_line - Line number of the function callsite in its parent if 'line'
+**      mode is enabled; zero otherwise.
 **    name - Name of the given function. As functions in Lua are first-class,
 **      they do not have a fixed name: some functions can be the value of
 **      multiple global variables, while others stored only in a table field.

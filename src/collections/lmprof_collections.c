@@ -126,14 +126,15 @@ LUA_API lmprof_StackInst *lmprof_stack_measured_pop(lmprof_Stack *s, lmprof_Even
 #define LMPROF_SIZEOF_HASH(BC) (offsetof(lmprof_Hash, buckets) + ((BC) * sizeof(lmprof_HashBucket)))
 
 /* @TODO: Consider bloom filters. */
-static LUA_INLINE lu_addr to_identifier(lu_addr fid, lu_addr pid) {
+static LUA_INLINE lu_addr to_identifier(lu_addr fid, lu_addr pid, int p_currentline) {
   const lu_addr p = (fid ^ pid);
-  return ((p >> 3) ^ (p >> 19) ^ (p & 7));
+  const lu_addr pcl = l_cast(lu_addr, p_currentline);
+  return ((p >> 3) ^ (p >> 19) ^ (p & 7)) + pcl;
 }
 
-/* <Function, Parent> identifiers mapped to hash bucket. */
-static LUA_INLINE size_t to_bucket(lu_addr fid, lu_addr pid, size_t bucketCount) {
-  return l_cast(size_t, to_identifier(fid, pid)) % bucketCount;
+/* <Function, Parent, LineNumber> identifiers mapped to hash bucket. */
+static LUA_INLINE size_t to_bucket(lu_addr fid, lu_addr pid, int p_currentline, size_t bucketCount) {
+  return l_cast(size_t, to_identifier(fid, pid, p_currentline)) % bucketCount;
 }
 
 LUA_API lmprof_Hash *lmprof_hash_create(lmprof_Alloc *alloc, size_t bucket_count) {
@@ -169,17 +170,17 @@ LUA_API void lmprof_hash_destroy(lmprof_Alloc *alloc, lmprof_Hash *hash) {
   lmprof_free(alloc, l_pcast(void *, hash), LMPROF_SIZEOF_HASH(hash->bucket_count));
 }
 
-LUA_API lu_addr lmprof_hash_identifier(lu_addr fid, lu_addr pid) {
-  return to_identifier(fid, pid);
+LUA_API lu_addr lmprof_hash_identifier(lu_addr fid, lu_addr pid, int p_currentline) {
+  return to_identifier(fid, pid, p_currentline);
 }
 
-LUA_API lmprof_Record *lmprof_hash_get(lmprof_Hash *h, lu_addr fid, lu_addr pid) {
-  const size_t bucket = to_bucket(fid, pid, h->bucket_count);
+LUA_API lmprof_Record *lmprof_hash_get(lmprof_Hash *h, lu_addr fid, lu_addr pid, int p_currentline) {
+  const size_t bucket = to_bucket(fid, pid, p_currentline, h->bucket_count);
 
   lmprof_HashBucket *fh = l_nullptr;
   lmprof_HashBucket *prev = l_nullptr;
   for (fh = h->buckets[bucket]; fh != l_nullptr; fh = fh->next) {
-    if (fid == fh->record->f_id && pid == fh->record->p_id) {
+    if (fid == fh->record->f_id && pid == fh->record->p_id && p_currentline == fh->record->p_currentline) {
       /*
       ** Move the record to the beginning of the linked bucket list. Hoping for
       ** some locality in hashing accesses.
@@ -199,7 +200,7 @@ LUA_API lmprof_Record *lmprof_hash_get(lmprof_Hash *h, lu_addr fid, lu_addr pid)
 LUA_API int lmprof_hash_insert(lmprof_Alloc *alloc, lmprof_Hash *h, lmprof_Record *record) {
   lmprof_HashBucket *val = l_pcast(lmprof_HashBucket *, lmprof_malloc(alloc, sizeof(lmprof_HashBucket)));
   if (val != l_nullptr) {
-    const size_t bucket = to_bucket(record->f_id, record->p_id, h->bucket_count);
+    const size_t bucket = to_bucket(record->f_id, record->p_id, record->p_currentline, h->bucket_count);
     val->record = record;
     val->next = h->buckets[bucket]; /* insert in front */
     h->buckets[bucket] = val;

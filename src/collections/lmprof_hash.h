@@ -51,13 +51,13 @@ LUA_API lmprof_Hash *lmprof_hash_create(lmprof_Alloc *alloc, size_t bucket_count
 LUA_API void lmprof_hash_destroy(lmprof_Alloc *alloc, lmprof_Hash *hash);
 
 /* Create an identifier that mixes the functions identifier with its parent. */
-LUA_API lu_addr lmprof_hash_identifier(lu_addr fid, lu_addr pid);
+LUA_API lu_addr lmprof_hash_identifier(lu_addr fid, lu_addr pid, int p_currentline);
 
 /*
 ** Fetch the function record associated with the function/parent relationship,
 ** or NULL if this hashtable contains no mapping for said functions.
 */
-LUA_API struct lmprof_Record *lmprof_hash_get(lmprof_Hash *h, lu_addr fid, lu_addr pid);
+LUA_API struct lmprof_Record *lmprof_hash_get(lmprof_Hash *h, lu_addr fid, lu_addr pid, int p_currentline);
 
 /*
 ** Inserts the function record into the hash table, i.e., associates the

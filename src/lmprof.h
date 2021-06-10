@@ -188,7 +188,7 @@ LUAI_FUNC void lmprof_thread_info(lua_State *L, int tab_id);
 */
 
 /* Fetch a trace record. */
-LUAI_FUNC lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar, lu_addr fid, lu_addr pid);
+LUAI_FUNC lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar, lu_addr fid, lu_addr pid, int p_currentline);
 
 /*
 ** Return true if the value at the provided index is a function and is

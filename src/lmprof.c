@@ -669,7 +669,7 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
     ** Push root record onto stack, the root record should exist on the stack
     ** for the duration of the profile.
     */
-    record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_ROOT, LMPROF_RECORD_ID_ROOT);
+    record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_ROOT, LMPROF_RECORD_ID_ROOT, 0);
     if (callback_api) {
       lmprof_stack_event_push(stack, record, &st->thread.r, 0);
     }
@@ -679,7 +679,7 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
 
     /* Populate the thread with its current traceback. */
     if (BITFIELD_TEST(st->conf, LMPROF_OPT_LOAD_STACK)) {
-      int level = 0;
+      int level = 0, last_line = 0;
       lu_addr last_fid = LMPROF_RECORD_ID_ROOT;
 
       /* Populate the thread with its current traceback. */
@@ -698,7 +698,7 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
 #endif
         }
 
-        record = lmprof_fetch_record(L, st, stack_debug, fid, last_fid);
+        record = lmprof_fetch_record(L, st, stack_debug, fid, last_fid, last_line);
         if (callback_api) {
           lmprof_stack_event_push(stack, record, &st->thread.r, istailcall);
         }
@@ -707,6 +707,7 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
         }
 
         last_fid = fid;
+        last_line = (debug.currentline >= 0) ? debug.currentline : 0;
       }
     }
   }
@@ -898,9 +899,9 @@ LUALIB_API int lmprof_get_name(lua_State *L) {
 ** probability of a hash collision. Technically this should be handled, however,
 ** that is a sacrifice willing to be made for the sake simplicity.
 */
-lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar, lu_addr fid, lu_addr pid) {
+lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar, lu_addr fid, lu_addr pid, int p_currentline) {
   lmprof_Record *record;
-  if ((record = lmprof_hash_get(st->i.hash, fid, pid)) == l_nullptr) {
+  if ((record = lmprof_hash_get(st->i.hash, fid, pid, p_currentline)) == l_nullptr) {
     /*
     ** Create a debugging record (formatted details) if current <function, parent>
     ** tuple does not exist in the hash table.
@@ -915,6 +916,7 @@ lmprof_Record *lmprof_fetch_record(lua_State *L, lmprof_State *st, lua_Debug *ar
     record->f_id = fid;
     record->p_id = pid;
     record->r_id = st->i.record_count++;
+    record->p_currentline = p_currentline;
 
     lmprof_record_update(L, &st->hook.alloc, ar, fid, &record->info);
     if (!lmprof_hash_insert(&st->hook.alloc, st->i.hash, record)) {

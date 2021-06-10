@@ -39,6 +39,7 @@
 #define LMPROF_STATE_IGNORE_ALLOC   0x10 /* Ignore allocator internals (often used in internal profiling functions) */
 #define LMPROF_STATE_IGNORE_CALL    0x20 /* Ignore luaD_hook of next function (often used when starting/stopping) */
 #define LMPROF_STATE_GC_WAS_RUNNING 0x40 /* Garbage collector state prior to profiling */
+#define LMPROF_STATE_PAUSED         0x80 /* See: lmprof_pause_execution */
 
 /* Profiler configuration */
 #define LMPROF_OPT_NONE               0x0
@@ -269,6 +270,24 @@ LUA_API void lmprof_finalize_profiler(lua_State *L, lmprof_State *st, int pop_re
 LUA_API void lmprof_shutdown_profiler(lua_State *L, lmprof_State *st);
 
 /* External API */
+
+/*
+** The resume/pause API is designed for cases of multiple Lua states sharing the
+** same routine/scope/sample interface.trace API.
+*/
+
+/*
+** Generate EXIT_SCOPE events for each remaining function on the stack.
+** Returning true if the profiler state has been paused; false otherwise. While
+** the profiler is in a 'paused' state LMPROF_STATE_PAUSED will be set.
+*/
+LUA_API int lmprof_pause_execution(lua_State *L, lmprof_State *st);
+
+/*
+** Generate ENTER_SCOPE events for each function on the threads current
+** call stack (thread.call_stack). Returning true on success; false otherwise.
+*/
+LUA_API int lmprof_resume_execution(lua_State *L, lmprof_State *st);
 
 /*
 ** Return a user-supplied name associated with the given lua_State; returning

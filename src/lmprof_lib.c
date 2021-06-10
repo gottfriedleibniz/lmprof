@@ -474,6 +474,10 @@ static LUA_INLINE lmprof_State *traceevent_prehook(lua_State *L) {
   else if (BITFIELD_TEST(st->mode, LMPROF_MODE_SINGLE_THREAD) && st->thread.main != L) {
     return l_nullptr;
   }
+  else if (BITFIELD_TEST(st->state, LMPROF_STATE_PAUSED)) {
+    lmprof_error(L, st, "profiler in a deferred state");
+    return l_nullptr;
+  }
   else if (BITFIELD_TEST(st->state, LMPROF_STATE_IGNORE_CALL)) {
     BITFIELD_CLEAR(st->state, LMPROF_STATE_IGNORE_CALL);
     return l_nullptr;
@@ -593,6 +597,38 @@ static void traceevent_instrument(lua_State *L, lua_Debug *ar) {
 
   BITFIELD_CLEAR(st->state, LMPROF_STATE_IGNORE_ALLOC); /* prehook: enable alloc count */
   PROFILE_ADJUST_OVERHEAD(L, st); /* change in times = overhead */
+}
+
+LUA_API int lmprof_resume_execution(lua_State *L, lmprof_State *st) {
+  if (st != l_nullptr
+      && st->thread.call_stack != l_nullptr
+      && BITFIELD_TEST(st->state, LMPROF_STATE_PAUSED)
+      && BITFIELD_TEST(st->mode, LMPROF_MODE_INSTRUMENT)
+      && BITFIELD_TEST(st->mode, LMPROF_CALLBACK_MASK)) {
+
+    st->thread.r.s.time = LMPROF_TIME(st);
+    if (traceevent_append_stack(L, st))
+      BITFIELD_CLEAR(st->state, LMPROF_STATE_PAUSED);
+
+    return 1;
+  }
+  return 0;
+}
+
+LUA_API int lmprof_pause_execution(lua_State *L, lmprof_State *st) {
+  if (st != l_nullptr
+      && st->thread.call_stack != l_nullptr
+      && !BITFIELD_TEST(st->state, LMPROF_STATE_PAUSED)
+      && BITFIELD_TEST(st->mode, LMPROF_MODE_INSTRUMENT)
+      && BITFIELD_TEST(st->mode, LMPROF_CALLBACK_MASK)) {
+
+    st->thread.r.s.time = LMPROF_TIME(st);
+    if (traceevent_clear_stack(L, st))
+      BITFIELD_SET(st->state, LMPROF_STATE_PAUSED);
+
+    return 1;
+  }
+  return 0;
 }
 
 /* }================================================================== */

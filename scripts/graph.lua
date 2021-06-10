@@ -9,9 +9,10 @@
             them, and functions for generating human readable and application
             specific outputs.
 
-    Two output formats are currently supported:
+    Three output formats are currently supported:
         1. Flat - A tabular representation that may optionally be delimited, e.g., a CSV.
         2. PepperFish - A layout similar to lua-users.org/wiki/PepperfishProfiler
+        3. Callgrind - A callgrind/kcachegrind compatible graph representation.
 
     The 'header' table of the lmprof 'graph' output supports the additional
     fields related to formatting and output of the graph:
@@ -55,6 +56,9 @@
 
     -- Generate a Pepperfish representation
     graph:Pepperfish(result.header)
+
+    -- Generate a Callgrind representation
+    graph:Callgrind(result.header)
 
 @LICENSE
     See Copyright Notice in lmprof_lib.h
@@ -908,6 +912,90 @@ function LMGraph:Pepperfish(header, outfile)
     end
     outfile:write_line("\nEND")
     outfile:flush()
+end
+
+--[[
+    Generate a callgrind/kcachegrind compatible graph representation. Note this
+    representation is generally used for when compress_graph is false.
+--]]
+function LMGraph:Callgrind(header, outfile)
+    outfile = outfile or LMGraph.StdOut
+    local sample = header.sample
+    local instrument = header.instrument
+    if not instrument and not sample then
+        error("Callgrind format requires instrumentation")
+    end
+
+    -- Layout the functions and then sort them
+    local functions = { }
+    for f,funcNode in pairs(self.functions) do
+        if funcNode.record ~= nil then
+            functions[#functions + 1] = f
+        end
+    end
+    table.sort(functions, CreatePrioritySort(self, LMGraph.Sorting[header.sort or "count"]))
+
+    -- Depth-first callgrind output function.
+    local CallgrindOutput = nil
+    CallgrindOutput = function(node)
+        if node.callgrind_reached then return end
+        node.callgrind_reached = true
+
+        local lineDefined = (node.record.linedefined < 0 and 0) or node.record.linedefined
+        outfile:write_line(("fn=(%d)"):format(node.callgrind_id))
+        if instrument then
+            outfile:write_line(("%d %d"):format(lineDefined, node.time))
+        else
+            outfile:write_line(("%d %d"):format(lineDefined, node.count))
+        end
+
+        if header.compress_graph then -- Ensure cycles don't exist
+            node.children[node.id] = nil
+        end
+
+        for cid,childNode in pairs(node.children) do
+            local count = (childNode.count <= 0 and 1) or childNode.count
+            outfile:write_line(("cfn=(%d)"):format(childNode.callgrind_id))
+            outfile:write_line(("calls=%d %d"):format(count, 0))
+            if instrument then
+                outfile:write_line(("%d %d"):format(childNode.record.parent_line, childNode.total_time))
+            else
+                outfile:write_line(("%d %d"):format(childNode.record.parent_line, childNode.child_count))
+            end
+        end
+
+        outfile:write_line("")
+        for cid,childNode in pairs(node.children) do
+            CallgrindOutput(childNode)
+        end
+    end
+
+    outfile:write_line(("events: %s"):format((instrument and "Time") or "Samples"))
+    outfile:write_line("")
+    outfile:write_line("# define function ID mapping")
+    for i=1,#functions do
+        local funcNode = self.functions[functions[i]]
+        local funcName = (funcNode.record.func == "0" and "main") or funcNode.name
+        local funcSource = funcNode.name:match("(%b())")
+        if funcSource ~= nil then
+            funcNode.callgrind_source = funcSource:sub(2, funcSource:len() - 1)
+        end
+
+        -- Generate a 'pseudo' name to ensure KCachegrind doesn't confuse or
+        -- unnecessarily compress nodes. Functions are first-class values so
+        -- emulate multiple export symbols.
+        if not header.compress_graph then
+            funcName = ("%s:%s"):format(funcName, funcNode.id)
+        end
+
+        funcNode.callgrind_id = i
+        outfile:write_line(("fn=(%d) %s"):format(funcNode.callgrind_id, funcName))
+        outfile:write_line(("fl=(%d) %s"):format(funcNode.callgrind_id, funcNode.callgrind_source or "[C]"))
+    end
+
+    outfile:write_line("")
+    outfile:write_line("# define callgraph")
+    CallgrindOutput(self.root)
 end
 
 return LMGraph

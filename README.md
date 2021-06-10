@@ -407,16 +407,16 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 ## Developer Notes
 
 ### Planned Features
-1. [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html) support.
 1. [cpuprofile-fileformat](https://gperftools.github.io/gperftools/cpuprofile-fileformat.html) support.
 1. [perf.data](https://github.com/torvalds/linux/blob/master/tools/perf/Documentation/perf.data-file-format.txt) support.
 1. [DevTools Protocol](https://github.com/ChromeDevTools/devtools-protocol/blob/master/json/js_protocol.json) support, e.g., "ProfileNode" and other sampling features that can be mapped to Lua.
 
 ### TODO
+Ordered by priority.
 1. Refactor. See the note in the header of lmprof.c.
 1. Handle RDTSC reset and `lu_time` overflows (especially on 32bit builds).
-1. Experiment with non-uniform sampling, e.g., dynamically estimate a `LUA_MASKCOUNT` value that estimates sampling
-uniformly in the 'time' domain (instead of instructions).
+1. Improve [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html) support, e.g., multi-threaded layouts.
+1. Experiment with non-uniform sampling, e.g., dynamically estimate a `LUA_MASKCOUNT` value that estimates sampling uniformly in the 'time' domain (instead of instructions). An alternative approach would to use OS-specific timers/signals to inform when sampling should occur (similar to LuaJIT).
 1. Casting from uint64_t (time/size measurement counters) to lua_Integer creates potential down-casting issues: traceevent_adjust and OPT_CLOCK_MICRO exist as potential solutions.
 1. Path-based `lmprof.ignore`: ignore the instrumentation of a function and all of its descendants.
 1. Encoded screenshot support: a Lua table (or another simple linked pager) of base64 encoded strings with optional limits on the amount of data that can be buffered.
@@ -425,6 +425,7 @@ uniformly in the 'time' domain (instead of instructions).
 1. [Lua](https://www.lua.org/versions.html).
 1. [lmprof](https://github.com/pmusa/lmprof): Original implementation from Pablo Musa.
 1. [PepperfishProfiler](http://lua-users.org/wiki/PepperfishProfiler): Reference style of formatted output.
+1. [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html): Reference.
 1. [Trace Event Format](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU): Original trace event specification and V8 [profiler specification](https://github.com/v8/v8/blob/44bd8fd7/src/inspector/js_protocol.json#L1399).
 1. [devtools-frontend](https://github.com/ChromeDevTools/devtools-frontend): Chrome DevTools client and webapp; modified version used in generating images in [docs](docs/).
 

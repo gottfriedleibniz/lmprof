@@ -3,6 +3,10 @@
 --
 -- Format:
 -- ./lua scripts/script.lua --format --input=docs/graph_2html.lua --path="scripts/?.lua"
+--
+-- Cachegrind:
+-- ./lua scripts/script.lua --input=scripts/test/2html.lua --path="scripts/?.lua" --compress_graph=false --callgrind > callgrind.out
+-- ./kcachegrind callgrind.out
 return {
 	header = {
 		clockid = "micro",

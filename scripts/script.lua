@@ -20,7 +20,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
   [-t | --time] [-m | --memory] [-e | --trace] [-l | --lines] [-s | --sample] [--single_thread]
   [--micro] [--compress_graph] [--load_stack] [--mismatch] [--line_freq] [--ignore_yield] [-g | --disable_gc] [-i | --instructions]
   [-p | --process] [-f | --draw_frame] [-c | --compress] [--split] [--tracing] [--page_limit] [--name] [--url]
-  [--pepper] [--json] [--sort] [--csv] [--show_lines] [-v | --verbose]
+  [--callgrind] [--pepper] [--json] [--sort] [--csv] [--show_lines] [-v | --verbose]
 
 [INPUT]
   --input: input script file
@@ -65,6 +65,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
     --url: Synthetic 'TracingStartedInBrowser' URL.
 
   [Output]:
+    --callgrind: Callgrind compatible layout
     --pepper: Pepperfish style layout (optional, default: false)
     --json: Write 'base' profiling output as formatted JSON.
     --sort: result sorting algorithm [count, size, time] (optional, default: count)
@@ -254,7 +255,9 @@ else
         graph:Verbose(result.header)
     end
 
-    if options:Bool("pepper", "p", false) then
+    if options:Bool("callgrind", "", false) then
+        graph:Callgrind(result.header)
+    elseif options:Bool("pepper", "p", false) then
         graph:Pepperfish(result.header)
     else
         graph:Flat(result.header)

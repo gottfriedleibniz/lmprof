@@ -142,6 +142,12 @@ end
 -------------- Execution --------------
 ---------------------------------------
 
+-- This CLI tool requires lmprof to be compiled with LMPROF_FILE_API.
+local has_io,_ = lmprof.has_io()
+if not has_io then
+    error("lmprof library must be compiled with LMPROF_FILE_API")
+end
+
 local options = ParseArguments(arg, "")
 local input = options:String("input", "", nil)
 local output = options:String("output", "", nil)

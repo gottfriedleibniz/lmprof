@@ -1441,10 +1441,16 @@ LUALIB_API int lmprof_get_timeunit(lua_State *L) {
 LUALIB_API int lmprof_get_has_io(lua_State *L) {
 #if defined(LMPROF_FILE_API)
   lua_pushboolean(L, 1);
+  lua_pushboolean(L, 1);
 #else
   lua_pushboolean(L, 0);
+  #if defined(LMPROF_DISABLE_OUTPUT_PATH)
+  lua_pushboolean(L, 0);
+  #else
+  lua_pushboolean(L, 1);
+  #endif
 #endif
-  return 1;
+  return 2;
 }
 
 #if defined(__cplusplus)

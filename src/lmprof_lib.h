@@ -8,7 +8,7 @@
 #include <lua.h>
 
 #define LMPROF_NAME "lmprof"
-#define LMPROF_VERSION "lmprof 0.1.11"
+#define LMPROF_VERSION "lmprof 0.1.12"
 #define LMPROF_COPYRIGHT "Copyright (C) 2021, Gottfried Leibniz"
 #define LMPROF_DESCRIPTION "A Lua Profiler"
 #if !defined(LUAMOD_API)
@@ -106,7 +106,7 @@ LUALIB_API int lmprof_start(lua_State *L);
 **    can be loaded with 'require' or 'dofile'. Meanwhile, 'trace' profiling
 **    will generate a JSON file.
 **
-** @NOTE: This requires LMPROF_FILE_API to be enabled, see lmprof.has_io
+** @NOTE: output_path requires LMPROF_FILE_API to be enabled (see 'has_io').
 */
 LUALIB_API int lmprof_stop(lua_State *L);
 
@@ -125,7 +125,7 @@ LUALIB_API int lmprof_quit(lua_State *L);
 **    'nil' output_path parameter to denote the result is to be returned as a
 **    Lua object.
 **
-** @NOTE: output_path requires LMPROF_FILE_API to be enabled, see 'has_io'.
+** @NOTE: output_path requires LMPROF_FILE_API to be enabled (see 'has_io').
 */
 
 /*
@@ -225,10 +225,14 @@ LUALIB_API int lmprof_get_option(lua_State *L);
 LUALIB_API int lmprof_get_timeunit(lua_State *L);
 
 /*
-** Push 'true' onto the stack if the profiler is configured for File/IO; false
-** otherwise. Returning 1.
+** Pushes two booleans onto the stack, has_file_io and requires_output, and
+** returns 2.
 **
-** See the LMPROF_FILE_API build option.
+**   'has_file_io' - True if the profiler is configured for File/IO; false o.w.
+**   'requires_output' - All 'output_path' parameters are required even if
+**      has_file_io is disabled.
+**
+** @SEE LMPROF_FILE_API and LMPROF_DISABLE_OUTPUT_PATH build options.
 */
 LUALIB_API int lmprof_get_has_io(lua_State *L);
 

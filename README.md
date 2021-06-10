@@ -115,10 +115,14 @@ lmprof.set_option(option, value)
 -- measurements, '-DLMPROF_RDTSC' force the usage of the RDTSC instruction.
 value = lmprof.time_unit()
 
--- Push 'true' onto the stack if the profiler is configured for File/IO; false
--- otherwise. Returning 1.
+-- Pushes two booleans onto the stack, has_file_io and requires_output, and
+-- returns 2.
 --
--- See the LMPROF_FILE_API build option.
+--   'has_file_io' - True if the profiler is configured for File/IO; false o.w.
+--   'requires_output' - All 'output_path' parameters are required even if
+--      has_file_io is disabled.
+--
+-- @SEE LMPROF_FILE_API and LMPROF_DISABLE_OUTPUT_PATH build options.
 value = lmprof.has_io()
 ```
 
@@ -187,7 +191,7 @@ state = lmprof.start(...)
 --    can be loaded with 'require' or 'dofile'. Meanwhile, 'trace' profiling
 --    will generate a JSON file.
 --
--- *NOTE*: output_path requires LMPROF_FILE_API to be enabled, see lmprof.has_io
+-- *NOTE*: output_path requires LMPROF_FILE_API to be enabled (see 'has_io').
 result = lmprof.stop([output_path])
 
 -- quit(): Preempt any active profiler state without reporting its results.
@@ -204,7 +208,7 @@ lmprof.quit()
 --    'nil' output_path parameter to denote the result is to be returned as a
 --    Lua object.
 --
--- NOTE: output_path requires LMPROF_FILE_API to be enabled, see 'has_io'.
+-- *NOTE*: output_path requires LMPROF_FILE_API to be enabled (see 'has_io').
 
 -- file(input_path, output_path, ...):
 --

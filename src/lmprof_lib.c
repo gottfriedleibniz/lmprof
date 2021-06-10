@@ -827,8 +827,13 @@ static int stop_profiler(lua_State *L, lmprof_State *st, int file_idx) {
 
 static int stack_object_profiler(lua_State *L, lmprof_State *active_state, int forcedMode, int forcedOpts, int state_idx, int args_top) {
   lmprof_State *st;
+#if defined(LMPROF_FILE_API) || !defined(LMPROF_DISABLE_OUTPUT_PATH)
   const int file_idx = state_idx + 2;
   const int mode_idx = state_idx + 3;
+#else
+  const int file_idx = 0;
+  const int mode_idx = state_idx + 2;
+#endif
   luaL_checkstack(L, 3, __FUNCTION__);
 
   st = active_state;
@@ -1355,8 +1360,13 @@ static int state_start(lua_State *L) {
 
 static int state_stop(lua_State *L) {
   lmprof_State *st = state_get(L, 1);
-  if (st == lmprof_singleton(L))
+  if (st == lmprof_singleton(L)) {
+#if defined(LMPROF_FILE_API) || !defined(LMPROF_DISABLE_OUTPUT_PATH)
     return stop_profiler(L, st, 2);
+#else
+    return stop_profiler(L, st, 0);
+#endif
+  }
 
   return luaL_error(L, "Could not stop profiler: profiler state inactive");
 }
@@ -1501,8 +1511,13 @@ LUALIB_API int lmprof_start(lua_State *L) {
 
 LUALIB_API int lmprof_stop(lua_State *L) {
   lmprof_State *st = lmprof_singleton(L);
-  if (st != l_nullptr)
+  if (st != l_nullptr) {
+#if defined(LMPROF_FILE_API) || !defined(LMPROF_DISABLE_OUTPUT_PATH)
     return stop_profiler(L, st, 1);
+#else
+    return stop_profiler(L, st, 0);
+#endif
+  }
 
   return luaL_error(L, "Could not stop profiler: profiler state does not exist.");
 }

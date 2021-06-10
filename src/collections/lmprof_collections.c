@@ -125,12 +125,35 @@ LUA_API lmprof_StackInst *lmprof_stack_measured_pop(lmprof_Stack *s, lmprof_Even
 /* Size of the hashtable. */
 #define LMPROF_SIZEOF_HASH(BC) (offsetof(lmprof_Hash, buckets) + ((BC) * sizeof(lmprof_HashBucket)))
 
+/* Source: 'Prospecting for Hash Functions': nullprogram.com/blog/2018/07/31/ */
+#if defined(LMPROF_HASH_SPLITMIX)
+#if LUA_32BITS
+static LUA_INLINE lu_addr splitmix(lu_addr x) { /* h2 */
+  x = ((x >> 16) ^ x) * 0x45d9f3b;
+  x = ((x >> 16) ^ x) * 0x45d9f3b;
+  x = (x >> 16) ^ x;
+  return x;
+}
+#else
+static LUA_INLINE lu_addr splitmix(lu_addr x) { /* splitmix */
+  x = (x ^ (x >> 30)) * l_cast(lu_addr, 0xbf58476d1ce4e5b9);
+  x = (x ^ (x >> 27)) * l_cast(lu_addr, 0x94d049bb133111eb);
+  x = x ^ (x >> 31);
+  return x;
+}
+#endif
+
+static LUA_INLINE lu_addr to_identifier(lu_addr fid, lu_addr pid, int p_currentline) {
+  return (splitmix(fid) ^ splitmix(pid)) + l_cast(lu_addr, p_currentline);
+}
+#else
 /* @TODO: Consider bloom filters. */
 static LUA_INLINE lu_addr to_identifier(lu_addr fid, lu_addr pid, int p_currentline) {
   const lu_addr p = (fid ^ pid);
   const lu_addr pcl = l_cast(lu_addr, p_currentline);
   return ((p >> 3) ^ (p >> 19) ^ (p & 7)) + pcl;
 }
+#endif
 
 /* <Function, Parent, LineNumber> identifiers mapped to hash bucket. */
 static LUA_INLINE size_t to_bucket(lu_addr fid, lu_addr pid, int p_currentline, size_t bucketCount) {

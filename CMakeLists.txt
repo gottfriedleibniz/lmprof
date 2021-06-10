@@ -206,6 +206,7 @@ OPTION(LMPROF_BUILTIN "Link against internal Lua headers" OFF)
 OPTION(LMPROF_FORCE_LOGGER "Force enable the debug logger" OFF)
 OPTION(LMPROF_RDTSC "Use the rdtsc (processor time stamp) instruction for timing" OFF)
 OPTION(LMPROF_FILE_API "Enable the usage of luaL_loadfile and other File IO. Otherwise, the Lua runtime is in charge of all serialization." ON)
+OPTION(LMPROF_HASH_SPLITMIX "Use a splitmix inspired hashing algorithm storing parent/child relationship structures" ON)
 OPTION(LMPROF_USE_STRHASH "If enabled, use the luaS_hash implementation. Otherwise, use jenkins-one-at-a-time for aggregating profile records." OFF)
 OPTION(LMPROF_RAW_CALIBRATION "Do not modify the calibration overhead. By default the calibration data is halved to ensure most/if-not-all potential variability is accounted for." OFF)
 
@@ -243,6 +244,10 @@ ENDIF()
 
 IF( LMPROF_STACK_SIZE )
   ADD_COMPILE_DEFINITIONS(LMPROF_MAXSTACK=${LMPROF_STACK_SIZE})
+ENDIF()
+
+IF( LMPROF_HASH_SPLITMIX )
+  ADD_COMPILE_DEFINITIONS(LMPROF_HASH_SPLITMIX)
 ENDIF()
 
 IF( LMPROF_HASH_SIZE )

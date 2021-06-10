@@ -361,6 +361,7 @@ A CMake project that builds the shared library is included. See `cmake -LAH` or 
 - **LMPROF\_RDTSC**: Use the 'Read Time-Stamp Counter' instruction for 'timing' rather than any OS-specific high resolution performance-counter, e.g., [QueryPerformanceCounter](https://docs.microsoft.com/en-us/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter).
 - **LMPROF\_STACK\_SIZE**: Maximum size of each coroutines profiler stack.
 - **LMPROF\_HASH\_SIZE**: Default bucket count in a hash table.
+- **LMPROF\_HASH\_SPLITMIX**: Enable a splitmix inspired hashing function for the hash table.
 - **LMPROF\_USE\_STRHASH**: Use luaS_hash. Otherwise, the default Jenkins one_at_a_time.
 - **LMPROF\_RAW\_CALIBRATION**: Do not post-process the calibration overhead. By default the calibration data is halved to ensure most potential variability is accounted for.
 - **TRACE\_EVENT\_PAGE\_SIZE**: The default TraceEventPage size.

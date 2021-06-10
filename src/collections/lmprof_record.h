@@ -117,11 +117,13 @@ static LUA_INLINE lu_size unit_allocated(const lmprof_EventUnit *u) {
 /* Reserved Function Identifiers */
 #define LMPROF_RECORD_ID_ROOT 0
 #define LMPROF_RECORD_ID_MAIN 1 /* 'm' */
-#define LMPROF_RECORD_ID_UNKNOWN 2 /* non collectible closures */
+#define LMPROF_RECORD_ID_GC 2
+#define LMPROF_RECORD_ID_UNKNOWN 3 /* non collectible closures */
 #define LMPROF_RESERVED_MAX (LMPROF_RECORD_ID_UNKNOWN + 1)
 
 #define LMPROF_RECORD_NAME_MAIN "main chunk"
 #define LMPROF_RECORD_NAME_ROOT "(root)"
+#define LMPROF_RECORD_NAME_GC "(profiler gc)"
 #define LMPROF_RECORD_NAME_UNKNOWN "?"
 
 /* Initialize meta-definitions for lmprof_Record's */

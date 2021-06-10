@@ -153,6 +153,9 @@ LUAI_FUNC int lmprof_verify_singleton(lua_State *L, lmprof_State *st);
 ** ===================================================================
 */
 
+/* Initialize meta-definitions for light-userdata lmprof_Stacks */
+LUAI_FUNC void lmprof_thread_stacks_initialize(lua_State *L);
+
 /*
 ** Return a unique integer identifier (e.g., if the garbage collector is
 ** disabled when profiling, the pointer can be used as an identifier) associated

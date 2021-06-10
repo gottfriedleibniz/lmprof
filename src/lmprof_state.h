@@ -79,6 +79,8 @@
 ** @TODO: Throw an error when: (including lua.h)
 **    (1) (LUA_VERSION_NUM >= 504) && !defined(LUAI_IS32INT) ; or
 **    (2) (LUA_VERSION_NUM < 503) && (LUAI_BITSINT < 32)
+**
+** @TODO: Allow custom LMPROF_TIME() hooks. The framework is already in place.
 */
 #if defined(LMPROF_RDTSC) || defined(LMPROF_RDTSCP)
   #define LUA_TIME lmprof_clock_rdtsc
@@ -156,6 +158,7 @@ struct lmprof_State {
 
     lua_State *state; /* Executing thread. */
     struct lmprof_Stack *call_stack; /* stack containing memory use when entering a function */
+    size_t stack_count; /* Number of allocated stacks */
   } thread;
 
   /*

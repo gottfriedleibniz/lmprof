@@ -571,6 +571,7 @@ LUA_API void lmprof_record_update(lua_State *L, lmprof_Alloc *alloc, lua_Debug *
   static const char *const reserved_identifiers[] = {
     LMPROF_RECORD_NAME_ROOT,
     LMPROF_RECORD_NAME_MAIN,
+    LMPROF_RECORD_NAME_GC,
     LMPROF_RECORD_NAME_UNKNOWN,
     l_nullptr
   };

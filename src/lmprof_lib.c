@@ -1596,6 +1596,7 @@ LUAMOD_API int luaopen_lmprof(lua_State *L) {
   lmprof_clock_init();
   lmprof_record_initialize(L);
   lmprof_report_initialize(L);
+  lmprof_thread_stacks_initialize(L);
   lmprof_state_initialize(L);
 #if LUA_VERSION_NUM == 501
   luaL_register(L, LMPROF_NAME, lmproflib);

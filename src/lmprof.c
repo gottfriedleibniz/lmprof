@@ -288,6 +288,7 @@ int lmprof_initialize_state(lua_State *L, lmprof_State *st, uint32_t mode, lmpro
   st->thread.mainproc.tid = LMPROF_THREAD_OFFSET(0);
   st->thread.state = l_nullptr;
   st->thread.call_stack = l_nullptr;
+  st->thread.stack_count = 0;
   st->thread.r.overhead = 0;
   st->thread.r.proc = st->thread.mainproc;
   unit_clear(&st->thread.r.s);
@@ -393,6 +394,7 @@ int lmprof_clear_state(lua_State *L, lmprof_State *st) {
   if (BITFIELD_TEST(st->state, LMPROF_STATE_PERSISTENT)) {
     st->thread.state = l_nullptr;
     st->thread.call_stack = l_nullptr;
+    st->thread.stack_count = 0;
     st->thread.r.overhead = 0;
     st->thread.r.proc = st->thread.mainproc;
     unit_clear(&st->thread.r.s);
@@ -477,8 +479,14 @@ void lmprof_clear_thread(lua_State *L, lmprof_State *st, lua_State *ignore) {
 #define REGISTRY_GET_SINGLETON(L) lua_getfield((L), LUA_REGISTRYINDEX, LMPROF_PROFILER_SINGLETON)
 #define REGISTRY_SET_SINGLETON(L) lua_setfield((L), LUA_REGISTRYINDEX, LMPROF_PROFILER_SINGLETON)
 
-/* Clear all threads and associated identifiers of 'dead' threads */
-static void lmprof_thread_info_gc(lua_State *L);
+/*
+** Clear all threads and associated identifiers of 'dead' threads.
+**
+** 'state' - The active profiler state. If non-null perform an internal garbage
+**  collection step: removing any dead threads and associated data from the
+**  registry.
+*/
+static void lmprof_thread_info_gc(lua_State *L, lmprof_State *state);
 
 /* Clear and deallocate all lua_State and profile stack associations. */
 static void lmprof_thread_stacktable_free(lua_State *L, int idx);
@@ -571,7 +579,7 @@ int lmprof_register_singleton(lua_State *L, int idx) {
     lmprof_hook_debug(L, 0); /* Assume profiled state: cache current debug.hook */
 
     lmprof_thread_stacktable_clear(L);
-    lmprof_thread_info_gc(L);
+    lmprof_thread_info_gc(L, l_nullptr);
     return 1;
   }
   return 0;
@@ -585,7 +593,7 @@ void lmprof_clear_singleton(lua_State *L) {
   lmprof_hook_debug(L, 1);
 
   lmprof_thread_stacktable_clear(L);
-  lmprof_thread_info_gc(L);
+  lmprof_thread_info_gc(L, l_nullptr);
 }
 
 int lmprof_verify_singleton(lua_State *L, lmprof_State *st) {
@@ -629,6 +637,45 @@ int lmprof_verify_singleton(lua_State *L, lmprof_State *st) {
 */
 
 /*
+@@ LMPROF_STACK_GC: Number of additionally profiled coroutines before invoking
+**  an internal garbage collection step. This handles use-cases where *many*
+**  short-lived coroutines are created during the duration of a profile.
+**
+** @TODO: Make runtime configurable.
+*/
+#if !defined(LMPROF_STACK_GC)
+  #define LMPROF_STACK_GC 64
+#endif
+
+/*
+** If the trace event API is enabled, generate a 'fake' event denoting that the
+** profiler is collecting garbage.
+*/
+static void lmprof_trace_gc_event(lua_State *L, lmprof_State *st, int begin_gc) {
+  if (BITFIELD_TEST(st->mode, LMPROF_CALLBACK_MASK)) {
+    int lmprof_errno = LUA_OK;
+    lmprof_StackInst *inst = l_nullptr;
+
+    st->thread.r.s.time = LUA_TIME();
+    if (begin_gc) {
+      lmprof_Record *record = lmprof_fetch_record(L, st, l_nullptr, LMPROF_RECORD_ID_GC, LMPROF_RECORD_ID_ROOT, 0);
+
+      inst = lmprof_stack_event_push(st->thread.call_stack, record, &st->thread.r, 0);
+      if ((lmprof_errno = st->i.trace.scope(L, st, inst, 1)) != LUA_OK) {
+        lmprof_error(L, st, "Error: %s", traceevent_strerror(lmprof_errno));
+      }
+    }
+    else {
+      inst = lmprof_stack_pop(st->thread.call_stack);
+      inst->trace.call = st->thread.r;
+      if ((lmprof_errno = st->i.trace.scope(L, st, inst, 0)) != LUA_OK) {
+        lmprof_error(L, st, "Error: %s", traceevent_strerror(lmprof_errno));
+      }
+    }
+  }
+}
+
+/*
 ** @TODO: This function is 'pure' profiler overhead; attempt to trim its
 ** execution time/complexity.
 */
@@ -654,10 +701,42 @@ lmprof_Stack *lmprof_thread_stacktable_get(lua_State *L, lmprof_State *st) {
   }
 
   lua_pop(L, 1); /* [..., thread_stacks] */
+
+  /*
+  ** Track the number of allocated profiler stacks. Performing a manual garbage
+  ** collection when that threshold is passed.
+  **
+  ** @NOTE Enabling this feature has the potential to distort "memory" profiling
+  ** as lmprof_thread_identifier_clear may trigger a Lua GC step/cycle.
+  **
+  **  If the flag LMPROF_STATE_IGNORE_ALLOC is enabled then all deallocations,
+  **  including ones script generated, will not be accounted for. Otherwise,
+  **  the amount 'deallocated' will include some profiling overhead.
+  **
+  **  The amount of 'overhead' can be minimized by having the profiler stacks
+  **  be light-userdata and then enabling 'LMPROF_STATE_IGNORE_ALLOC' for that
+  **  deallocation.
+  */
+  st->thread.stack_count++;
+  if (!BITFIELD_TEST(st->state, LMPROF_STATE_SETTING_UP)) {
+    if ((st->thread.stack_count % LMPROF_STACK_GC) == 0) {
+      LMPROF_LOG("[%s] Garbage collection\n", __FUNCTION__);
+
+      lmprof_trace_gc_event(L, st, 1);
+      lmprof_thread_info_gc(L, st);
+#if LUA_VERSION_NUM >= 503
+      if (lua_gc(L, LUA_GCISRUNNING, 0))
+        lua_gc(L, LUA_GCCOLLECT, 0);
+#endif
+      lmprof_trace_gc_event(L, st, 0);
+    }
+  }
+
   thread_identifier = lmprof_thread_identifier(L);
+  stack = lmprof_stack_light_new(&st->hook.alloc, thread_identifier, callback_api);
 
   lua_pushthread(L); /* [..., thread_stacks, thread] */
-  stack = lmprof_stack_new(L, thread_identifier, callback_api); /* [..., thread_stacks, thread, stack] */
+  lua_pushlightuserdata(L, l_pcast(void *, stack));  /* [..., thread_stacks, thread, stack] */
   if (stack != l_nullptr) {
     lmprof_Record *record = l_nullptr;
 
@@ -745,6 +824,29 @@ void lmprof_thread_stacktable_free(lua_State *L, int idx) {
   }
 }
 
+static int lmprof_thread_stacktable_gc(lua_State *L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  lmprof_thread_stacktable_free(L, 1);
+  return 0;
+}
+
+void lmprof_thread_stacks_initialize(lua_State *L) {
+  static const luaL_Reg stacks_metameth[] = {
+    { "__gc", lmprof_thread_stacktable_gc },
+    { l_nullptr, l_nullptr }
+  };
+
+  lmprof_getlibtable(L, LMPROF_TAB_THREAD_STACKS); /* [..., thread_stacks] */
+#if LUA_VERSION_NUM == 501
+  lua_newtable(L);
+  luaL_register(L, l_nullptr, stacks_metameth);
+#else
+  luaL_newlib(L, stacks_metameth);
+#endif
+  lua_setmetatable(L, -2);
+  lua_pop(L, 1);
+}
+
 lua_Integer lmprof_thread_identifier(lua_State *L) {
   lua_Integer id = 0;
 
@@ -777,7 +879,7 @@ lua_Integer lmprof_thread_identifier(lua_State *L) {
   return id;
 }
 
-void lmprof_thread_info_gc(lua_State *L) {
+void lmprof_thread_info_gc(lua_State *L, lmprof_State *st) {
   luaL_checkstack(L, 6, __FUNCTION__);
   lmprof_getlibtable(L, LMPROF_TAB_THREAD_NAMES); /* [..., name_table] */
   lmprof_getlibtable(L, LMPROF_TAB_THREAD_IDS); /* [..., name_table, thread_lookup] */
@@ -803,6 +905,33 @@ void lmprof_thread_info_gc(lua_State *L) {
   }
 
   lua_pop(L, 2);
+
+  /* Cleanup allocated profiler stacks */
+  if (st != l_nullptr) {
+    const uint32_t fAllocBefore = BITFIELD_TEST(st->state, LMPROF_STATE_IGNORE_ALLOC);
+
+    lmprof_getlibtable(L, LMPROF_TAB_THREAD_STACKS); /* [..., stack_table] */
+    lua_pushnil(L);
+    while (lua_next(L, -2) != 0) { /* [..., stack_table, key, value] */
+      lua_State *co = lua_tothread(L, -2);
+      if (co != l_nullptr && L != co && !luaL_verify_thread(co)) {
+        if (lua_islightuserdata(L, -1)) {
+          lmprof_Stack *stack = l_pcast(lmprof_Stack *, lua_touserdata(L, -1));
+
+          BITFIELD_SET(st->state, LMPROF_STATE_IGNORE_ALLOC);
+          lmprof_stack_light_free(&st->hook.alloc, stack);
+          BITFIELD_CLEAR(st->state, LMPROF_STATE_IGNORE_ALLOC);
+          BITFIELD_SET(st->state, fAllocBefore);
+        }
+
+        lua_pushvalue(L, -2); /* [..., stack_table, key, value, key] */
+        lua_pushnil(L); /* [..., stack_table, key, value, key, nil] */
+        lua_rawset(L, -5); /* [..., stack_table, key, value] */
+      }
+      lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+  }
 }
 
 LUA_API const char *lmprof_thread_name(lua_State *L, lua_Integer thread_id, const char *opt) {

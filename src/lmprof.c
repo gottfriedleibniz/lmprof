@@ -1079,6 +1079,7 @@ EXTERN_OPT const char *const lmprof_option_strings[] = {
   "load_stack",
   "mismatch",
   "verbose",
+  "output_string",
   "line_freq",
   "hash_size",
   "counter_freq",
@@ -1103,6 +1104,7 @@ EXTERN_OPT const uint32_t lmprof_option_codes[] = {
   LMPROF_OPT_LOAD_STACK,
   LMPROF_OPT_STACK_MISMATCH,
   LMPROF_OPT_REPORT_VERBOSE,
+  LMPROF_OPT_REPORT_STRING,
   LMPROF_OPT_LINE_FREQUENCY,
   LMPROF_OPT_HASH_SIZE,
   LMPROF_OPT_TRACE_COUNTERS_FREQ,
@@ -1177,6 +1179,7 @@ LUALIB_API int lmprof_set_option(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_REPORT_VERBOSE:
+    case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
     case LMPROF_OPT_TRACE_IGNORE_YIELD:
     case LMPROF_OPT_TRACE_DRAW_FRAME:
@@ -1255,6 +1258,7 @@ LUALIB_API int lmprof_get_option(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_REPORT_VERBOSE:
+    case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
     case LMPROF_OPT_TRACE_IGNORE_YIELD:
     case LMPROF_OPT_TRACE_DRAW_FRAME:

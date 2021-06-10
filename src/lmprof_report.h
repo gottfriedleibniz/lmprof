@@ -138,6 +138,7 @@
 typedef enum lmprof_ReportType {
   lTable, /* Generate an array of profiling records. */
   lFile, /* Write profiling records to file (format defined by profiling mode); requires LMPROF_FILE_API */
+  lBuffer, /* Write profiling records to a luaL_Buffer; returning the string. */
 } lmprof_ReportType;
 
 /* Common header for dumping reports */
@@ -168,6 +169,11 @@ typedef struct lmprof_Report {
       int delim; /* Requires delimitation on next write */
       const char *indent; /* Current indentation string (often a function of some nested depth) */
     } f;
+    struct {
+      luaL_Buffer buff;
+      int delim;
+      const char *indent;
+    } b;
   };
 } lmprof_Report;
 

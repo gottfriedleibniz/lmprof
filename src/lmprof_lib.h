@@ -8,7 +8,7 @@
 #include <lua.h>
 
 #define LMPROF_NAME "lmprof"
-#define LMPROF_VERSION "lmprof 0.1.4"
+#define LMPROF_VERSION "lmprof 0.1.5"
 #define LMPROF_COPYRIGHT "Copyright (C) 2021, Gottfried Leibniz"
 #define LMPROF_DESCRIPTION "A Lua Profiler"
 #if !defined(LUAMOD_API)
@@ -95,8 +95,8 @@ LUALIB_API int lmprof_start(lua_State *L);
 
 /*
 ** stop([output_path]): Stop the profiler singleton and build its results. If no
-**  output_path is supplied a formatted Lua table is pushed onto the stack.
-**  Otherwise, the success of the IO (true/false) is placed onto the stack.
+**  output_path is supplied a formatted Lua table or string is returned.
+**  Otherwise, the success of the IO (true/false) is returned.
 **
 **  lmprof_report.h contains the specifications for the different "result"
 **  structures depending on the profile mode.
@@ -165,6 +165,9 @@ LUALIB_API int lmprof_profile_function(lua_State *L);
 **      instantiation. Note, this option is closely related to mismatch.
 **    'line_freq' - Create a frequency list of line-executions for each profiled
 **      Lua function (graph instrumentation; requires "line" mode).
+**    'output_string' - Output a string representation of the formatted output.
+**        GRAPH - A Lua table; see '_G.load'
+**        TRACEEVENT - A formatted JSON string.
 **
 **  General Options: [INTEGER]
 **    'instructions' - Number of Lua instructions to execute before generating a

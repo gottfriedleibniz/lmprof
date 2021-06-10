@@ -50,6 +50,7 @@ script [--input] [--output] [--format] [--path] [--args] [-h | --help]
     --disable_gc: Disable the Lua garbage collector for the duration of the profile.
     --instructions=count: Number of Lua instructions to execute before generating a 'sampling' event.
     --calibrate: perform a calibration, i.e., determine an estimation, preferably an underestimation, of the Lua function call overhead.
+    --output_string: Output a formatted Lua string instead of writing (antithesis to LMPROF_FILE_API)
 
   [TraceEvent]:
     --process=value: Synthetic process ID.
@@ -165,6 +166,7 @@ end
 
 --[[ OPTIONS --]]
 lmprof.set_option("verbose", options:Bool("verbose", "v", false))
+lmprof.set_option("output_string", options:Bool("output_string", "", false))
 lmprof.set_option("micro", options:Bool("micro", "", false))
 lmprof.set_option("load_stack", options:Bool("load_stack", "", true))
 lmprof.set_option("mismatch", options:Bool("mismatch", "", false))
@@ -224,11 +226,17 @@ if output then
         error(("Failure writing to: %s"):format(output))
     end
 elseif options:Bool("json", "j", false) or trace_mode then
-    json = require('dkjson')
-    print(json.encode(result.records, {
-        level = 0, indent = true,
-        keyorder = { "cat", "name", "ph", "pid", "tid", "ts", "args",},
-    }))
+    if options:Bool("output_string", "", false) then
+        print(result)
+    else
+        json = require('dkjson')
+        print(json.encode(result.records, {
+            level = 0, indent = true,
+            keyorder = { "cat", "name", "ph", "pid", "tid", "ts", "args",},
+        }))
+    end
+elseif options:Bool("output_string", "", false) then
+    print(result)
 else
     local Graph = require('graph')
 

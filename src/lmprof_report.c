@@ -22,6 +22,41 @@
 #define LMPROF_NL "\n"
 #define LMPROF_INDENT "\t"
 
+/* lua_pushfstring integer format */
+#if LUA_VERSION_NUM >= 503
+  #define LUA_INT_FORMAT "%I"
+  #define LUA_UNIT_FORMAT "%I"
+
+  #define LUA_INT_CAST(T) l_cast(lua_Integer, T)
+  #define LUA_UNIT_CAST(T) l_cast(lua_Integer, T)
+#else
+  #define LUA_INT_FORMAT "%d"
+  #define LUA_UNIT_FORMAT "%f"
+
+  #define LUA_INT_CAST(T) l_cast(int, T)
+  #define LUA_UNIT_CAST(T) l_cast(lua_Number, T)
+#endif
+
+/* Add a string literal to a string buffer. */
+#if !defined(luaL_addliteral)
+  #define luaL_addliteral(B, s) \
+    luaL_addlstring(B, "" s, (sizeof((s)) / sizeof(char)) - 1)
+#endif
+
+/* Adds a formatted string literal to a string buffer. */
+#define luaL_addfstring(L, B, F, ...)       \
+  LUA_MLM_BEGIN                             \
+  lua_pushfstring((L), (F), ##__VA_ARGS__); \
+  luaL_addvalue((B));                       \
+  LUA_MLM_END
+
+/* LMPROF_PRINTF for string buffers. */
+#define luaL_addifstring(L, B, F, ...)                                        \
+  LUA_MLM_BEGIN                                                               \
+  lua_pushfstring((L), "%s" LMPROF_INDENT "" F "," LMPROF_NL, ##__VA_ARGS__); \
+  luaL_addvalue((B));                                                         \
+  LUA_MLM_END
+
 /*
 ** {==================================================================
 ** File Handling
@@ -78,7 +113,7 @@ static FILE **io_fud(lua_State *L, const char *output) {
 */
 #define IDENTIFIER_BUFFER_LENGTH 256
 
-static int profiler_header(lua_State *L, const lmprof_Report *R) {
+static int profiler_header(lua_State *L, lmprof_Report *R) {
   lmprof_State *st = R->st;
   const uint32_t mode = R->st->mode;
   const uint32_t conf = R->st->conf;
@@ -118,6 +153,24 @@ static int profiler_header(lua_State *L, const lmprof_Report *R) {
     return LMPROF_REPORT_DISABLED_IO;
 #endif
   }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    const char *indent = R->b.indent;
+
+    luaL_addifstring(L, b, "clockid = \"%s\"", indent, LMPROF_TIME_ID(conf));
+    luaL_addifstring(L, b, "instrument = %s", indent, BITFIELD_TEST(mode, LMPROF_MODE_INSTRUMENT) ? "true" : "false");
+    luaL_addifstring(L, b, "memory = %s", indent, BITFIELD_TEST(mode, LMPROF_MODE_MEMORY) ? "true" : "false");
+    luaL_addifstring(L, b, "sample = %s", indent, BITFIELD_TEST(mode, LMPROF_MODE_SAMPLE) ? "true" : "false");
+    luaL_addifstring(L, b, "callback = %s", indent, BITFIELD_TEST(mode, LMPROF_CALLBACK_MASK) ? "true" : "false");
+    luaL_addifstring(L, b, "single_thread = %s", indent, BITFIELD_TEST(mode, LMPROF_MODE_SINGLE_THREAD) ? "true" : "false");
+    luaL_addifstring(L, b, "mismatch = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_STACK_MISMATCH) ? "true" : "false");
+    luaL_addifstring(L, b, "line_freq = %s", indent, BITFIELD_TEST(conf, LMPROF_OPT_LINE_FREQUENCY) ? "true" : "false");
+    luaL_addifstring(L, b, "sampler_count = " LUA_INT_FORMAT, indent, LUA_INT_CAST(st->i.mask_count));
+    luaL_addifstring(L, b, "instr_count = " LUA_INT_FORMAT, indent, LUA_INT_CAST(st->i.instr_count));
+    luaL_addifstring(L, b, "profile_overhead = " LUA_INT_FORMAT, indent, LUA_INT_CAST(LMPROF_TIME_ADJ(st->thread.r.overhead, conf)));
+    luaL_addifstring(L, b, "calibration = " LUA_INT_FORMAT, indent, LUA_INT_CAST(LMPROF_TIME_ADJ(st->i.calibration, conf)));
+    return LUA_OK;
+  }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
 
@@ -138,13 +191,17 @@ static int graph_hash_callback(lua_State *L, lmprof_Record *record, void *args) 
 
   const uint32_t mode = st->mode;
   const lmprof_FunctionInfo *info = &record->info;
+  luaL_checkstack(L, 8, __FUNCTION__);
   if (R->type == lTable) {
     char rid_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
     char fid_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
     char pid_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
-    snprintf(rid_str, sizeof(rid_str), "%" PRIluADDR "", record->r_id);
-    snprintf(fid_str, sizeof(fid_str), "%" PRIluADDR "", record->f_id);
-    snprintf(pid_str, sizeof(pid_str), "%" PRIluADDR "", record->p_id);
+    if (snprintf(rid_str, sizeof(rid_str), "%" PRIluADDR "", record->r_id) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+    if (snprintf(fid_str, sizeof(fid_str), "%" PRIluADDR "", record->f_id) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+    if (snprintf(pid_str, sizeof(pid_str), "%" PRIluADDR "", record->p_id) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
 
     /* Function header */
     lua_newtable(L);
@@ -273,12 +330,82 @@ static int graph_hash_callback(lua_State *L, lmprof_Record *record, void *args) 
     return LMPROF_REPORT_DISABLED_IO;
 #endif
   }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    const char *indent = R->b.indent;
+
+    char rid_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    char fid_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    char pid_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(rid_str, sizeof(rid_str), "%" PRIluADDR "", record->r_id) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+    if (snprintf(fid_str, sizeof(fid_str), "%" PRIluADDR "", record->f_id) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+    if (snprintf(pid_str, sizeof(pid_str), "%" PRIluADDR "", record->p_id) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    luaL_addfstring(L, b, "%s{" LMPROF_NL, indent);
+
+    /* Function header */
+    luaL_addifstring(L, b, "id = \"%s\"", indent, rid_str);
+    luaL_addifstring(L, b, "func = \"%s\"", indent, fid_str);
+    luaL_addifstring(L, b, "parent = \"%s\"", indent, pid_str);
+    luaL_addifstring(L, b, "parent_line = %d", indent, record->p_currentline);
+    luaL_addifstring(L, b, "ignored = %s", indent, BITFIELD_TEST(info->event, LMPROF_RECORD_IGNORED) ? "true" : "false");
+    luaL_addifstring(L, b, "name = \"%s\"", indent, (info->name == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->name);
+    luaL_addifstring(L, b, "what = \"%s\"", indent, (info->what == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->what);
+    luaL_addifstring(L, b, "source = \"%s\"", indent, (info->source == l_nullptr) ? LMPROF_RECORD_NAME_UNKNOWN : info->source);
+
+    /* Function statistics */
+    luaL_addifstring(L, b, "count = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(record->graph.count));
+    if (BITFIELD_TEST(mode, LMPROF_MODE_INSTRUMENT)) {
+      luaL_addifstring(L, b, "time = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(LMPROF_TIME_ADJ(record->graph.node.time, st->conf)));
+      luaL_addifstring(L, b, "total_time = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(LMPROF_TIME_ADJ(record->graph.path.time, st->conf)));
+    }
+
+    if (BITFIELD_TEST(mode, LMPROF_MODE_MEMORY)) {
+      luaL_addifstring(L, b, "allocated = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(record->graph.node.allocated));
+      luaL_addifstring(L, b, "deallocated = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(record->graph.node.deallocated));
+      luaL_addifstring(L, b, "total_allocated = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(record->graph.path.allocated));
+      luaL_addifstring(L, b, "total_deallocated = " LUA_UNIT_FORMAT "", indent, LUA_UNIT_CAST(record->graph.path.deallocated));
+    }
+
+    /* Spurious activation record data */
+    luaL_addifstring(L, b, "linedefined = %d", indent, info->linedefined);
+    luaL_addifstring(L, b, "lastlinedefined = %d", indent, info->lastlinedefined);
+    luaL_addifstring(L, b, "nups = %d", indent, info->nups);
+#if LUA_VERSION_NUM >= 502
+    luaL_addifstring(L, b, "nparams = %d", indent, info->nparams);
+    luaL_addifstring(L, b, "isvararg = %d", indent, info->isvararg);
+    luaL_addifstring(L, b, "istailcall = %d", indent, info->istailcall);
+#endif
+#if LUA_VERSION_NUM >= 504
+    luaL_addifstring(L, b, "ftransfer = %d", indent, info->ftransfer);
+    luaL_addifstring(L, b, "ntransfer = %d", indent, info->ntransfer);
+#endif
+
+    /* Line profiling enabled */
+    if (record->graph.line_freq != l_nullptr && record->graph.line_freq_size > 0) {
+      const size_t *freq = record->graph.line_freq;
+      const int freq_size = record->graph.line_freq_size;
+      int i = 0;
+
+      luaL_addfstring(L, b, "%s" LMPROF_INDENT "lines = {", indent);
+      luaL_addfstring(L, b, "%zu", freq[0]);
+      for (i = 1; i < freq_size; ++i)
+        luaL_addfstring(L, b, ", %zu", freq[i]);
+      luaL_addfstring(L, b, "}," LMPROF_NL);
+    }
+    luaL_addfstring(L, b, "%s}," LMPROF_NL, indent);
+    return LUA_OK;
+  }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
 
 static int graph_report(lua_State *L, lmprof_Report *report) {
   lmprof_State *st = report->st;
 
+  luaL_checkstack(L, 8, __FUNCTION__);
   if (report->type == lTable) {
     lua_newtable(L); /* [..., header] */
     profiler_header(L, report);
@@ -313,6 +440,24 @@ static int graph_report(lua_State *L, lmprof_Report *report) {
     return LMPROF_REPORT_DISABLED_IO;
 #endif
   }
+  else if (report->type == lBuffer) {
+    luaL_Buffer *b = &report->b.buff;
+
+    /* Header */
+    report->b.indent = LMPROF_INDENT;
+    luaL_addliteral(b, "return {" LMPROF_NL);
+    luaL_addliteral(b, LMPROF_INDENT "header = {" LMPROF_NL);
+    profiler_header(L, report);
+    luaL_addliteral(b, LMPROF_INDENT "}," LMPROF_NL);
+
+    /* Profile Records */
+    report->b.indent = LMPROF_INDENT LMPROF_INDENT;
+    luaL_addliteral(b, LMPROF_INDENT "records = {" LMPROF_NL);
+    lmprof_hash_report(L, st->i.hash, (lmprof_hash_Callback)graph_hash_callback, l_pcast(const void *, report));
+    luaL_addliteral(b, LMPROF_INDENT "}" LMPROF_NL "}" LMPROF_NL);
+    return LUA_OK;
+  }
+
   return LMPROF_REPORT_FAILURE;
 }
 
@@ -361,12 +506,21 @@ static int graph_report(lua_State *L, lmprof_Report *report) {
     lua_rawseti((L), (R)->t.table_index, (R)->t.array_count++); \
   LUA_MLM_END
 
-#define REPORT_ENSURE_DELIM(R)                                         \
+#define REPORT_ENSURE_FILE_DELIM(R)                                    \
   LUA_MLM_BEGIN                                                        \
   if ((R)->f.delim) {                                                  \
     fprintf((R)->f.file, JSON_DELIM JSON_NEWLINE "%s", (R)->f.indent); \
     (R)->f.delim = 0;                                                  \
   }                                                                    \
+  LUA_MLM_END
+
+#define REPORT_ENSURE_BUFFER_DELIM(R)                     \
+  LUA_MLM_BEGIN                                           \
+  if ((R)->b.delim) {                                     \
+    luaL_addliteral(&R->b.buff, JSON_DELIM JSON_NEWLINE); \
+    luaL_addstring(&R->b.buff, (R)->b.indent);            \
+    (R)->b.delim = 0;                                     \
+  }                                                       \
   LUA_MLM_END
 
 /* MetaEvents */
@@ -416,7 +570,7 @@ static int __metaProcess(lua_State *L, lmprof_Report *R, const lmprof_EventProce
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING("__metadata")));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s")), name);
@@ -433,6 +587,24 @@ static int __metaProcess(lua_State *L, lmprof_Report *R, const lmprof_EventProce
     return LMPROF_REPORT_DISABLED_IO;
 #endif
   }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING("__metadata")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s")), name);
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("M")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ts", "0"));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(process->pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(process->tid));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("args", ""));
+    luaL_addfstring(L, b, JSON_OPEN_OBJ JSON_ASSIGN("name", JSON_STRING("%s")) JSON_CLOSE_OBJ, pname);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
+  }
+
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
 
@@ -453,7 +625,7 @@ static int __metaAbout(lua_State *L, lmprof_Report *R, const char *name, const c
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_ASSIGN("metadata", JSON_OPEN_OBJ JSON_NEWLINE));
     fprintf(f, JSON_ASSIGN("bitness", "64") JSON_DELIM JSON_NEWLINE);
     fprintf(f, JSON_ASSIGN("domain", JSON_STRING("WIN_QPC")) JSON_DELIM JSON_NEWLINE);
@@ -469,6 +641,23 @@ static int __metaAbout(lua_State *L, lmprof_Report *R, const char *name, const c
 #else
     return LMPROF_REPORT_DISABLED_IO;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_ASSIGN("metadata", JSON_OPEN_OBJ JSON_NEWLINE));
+    luaL_addliteral(b, JSON_ASSIGN("bitness", "64") JSON_DELIM JSON_NEWLINE);
+    luaL_addliteral(b, JSON_ASSIGN("domain", JSON_STRING("WIN_QPC")) JSON_DELIM JSON_NEWLINE);
+    luaL_addliteral(b, JSON_ASSIGN("command_line", JSON_STRING("")) JSON_DELIM JSON_NEWLINE);
+    luaL_addliteral(b, JSON_ASSIGN("highres-ticks", "1") JSON_DELIM JSON_NEWLINE);
+    luaL_addliteral(b, JSON_ASSIGN("physical-memory", "0") JSON_DELIM JSON_NEWLINE);
+    luaL_addfstring(L, b, JSON_ASSIGN("user-agent", JSON_STRING("%s")) JSON_DELIM JSON_NEWLINE, name);
+    luaL_addfstring(L, b, JSON_ASSIGN("command_line", JSON_STRING("%s")) JSON_DELIM JSON_NEWLINE, url);
+    luaL_addliteral(b, JSON_ASSIGN("v8-version", JSON_STRING(LUA_VERSION)) JSON_NEWLINE);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -504,7 +693,7 @@ static int __metaTracingStarted(lua_State *L, lmprof_Report *R, const lmprof_Eve
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMLINE)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("TracingStartedInBrowser")));
@@ -529,6 +718,33 @@ static int __metaTracingStarted(lua_State *L, lmprof_Report *R, const lmprof_Eve
     return LUA_OK;
 #endif
   }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMLINE)));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("TracingStartedInBrowser")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("I")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(process->pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(process->tid));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ts", "0"));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("args", JSON_OPEN_OBJ));
+    luaL_addliteral(b, JSON_ASSIGN("data", JSON_OPEN_OBJ));
+    luaL_addliteral(b, JSON_ASSIGN("frameTreeNodeId", "1"));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("persistentIds", "true"));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("frames", JSON_OPEN_ARRAY JSON_OPEN_OBJ));
+    luaL_addliteral(b, JSON_ASSIGN("frame", JSON_STRING("FADE")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("url", JSON_STRING("%s")), CHROME_OPT_NAME(url, TRACE_EVENT_DEFAULT_URL));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s")), CHROME_OPT_NAME(name, TRACE_EVENT_DEFAULT_NAME));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("processId", LUA_INT_FORMAT), LUA_INT_CAST(process->pid));
+    luaL_addliteral(b, JSON_CLOSE_OBJ JSON_CLOSE_ARRAY);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
+  }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
 
@@ -549,7 +765,7 @@ static int __enterFrame(lua_State *L, lmprof_Report *R, const TraceEvent *event)
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMELINE_FRAME)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("BeginFrame")));
@@ -564,6 +780,27 @@ static int __enterFrame(lua_State *L, lmprof_Report *R, const TraceEvent *event)
     R->f.delim = 1;
     return LUA_OK;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMELINE_FRAME)));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("BeginFrame")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("s", JSON_STRING("t")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("I")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.tid));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("args", ""));
+    luaL_addliteral(b, JSON_OPEN_OBJ JSON_ASSIGN("layerTreeId", "null") " }");
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -588,7 +825,7 @@ static int __exitFrame(lua_State *L, lmprof_Report *R, const TraceEvent *event) 
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMELINE_FRAME)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("ActivateLayerTree")));
@@ -606,6 +843,30 @@ static int __exitFrame(lua_State *L, lmprof_Report *R, const TraceEvent *event) 
     R->f.delim = 1;
     return LUA_OK;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMELINE_FRAME)));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("ActivateLayerTree")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("s", JSON_STRING("t")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("I")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.tid));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("args", ""));
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addfstring(L, b, JSON_ASSIGN("frameId", LUA_INT_FORMAT), LUA_INT_CAST(event->data.frame.frame));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("layerTreeId", "null"));
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -628,7 +889,7 @@ static int __drawFrame(lua_State *L, lmprof_Report *R, const TraceEvent *event) 
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMELINE_FRAME)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("DrawFrame")));
@@ -643,6 +904,27 @@ static int __drawFrame(lua_State *L, lmprof_Report *R, const TraceEvent *event) 
     R->f.delim = 1;
     return LUA_OK;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMELINE_FRAME)));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("DrawFrame")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("s", JSON_STRING("t")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("I")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.tid));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("args", ""));
+    luaL_addliteral(b, JSON_OPEN_OBJ JSON_ASSIGN("layerTreeId", "null") " " JSON_CLOSE_OBJ);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -665,7 +947,7 @@ static int __eventScope(lua_State *L, lmprof_Report *R, const TraceEvent *event,
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_USER_TIMING)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s")), eventName);
@@ -682,6 +964,27 @@ static int __eventScope(lua_State *L, lmprof_Report *R, const TraceEvent *event,
 #else
     return LMPROF_REPORT_DISABLED_IO;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_USER_TIMING)));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s")), eventName);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("%s")), name);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.pid));
+    if (op_routine(event->op))
+      luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(R->st->thread.mainproc.tid));
+    else
+      luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.tid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -703,7 +1006,7 @@ static int __eventLineInstance(lua_State *L, lmprof_Report *R, const TraceEvent 
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_USER_TIMING)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s: Line %d")), event->data.line.info->source, event->data.line.line);
@@ -718,6 +1021,25 @@ static int __eventLineInstance(lua_State *L, lmprof_Report *R, const TraceEvent 
 #else
     return LMPROF_REPORT_DISABLED_IO;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_USER_TIMING)));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("%s: Line %d")), event->data.line.info->source, event->data.line.line);
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("I")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("s", JSON_STRING("t")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(event->call.proc.tid));
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -739,7 +1061,7 @@ static int __eventSampleInstance(lua_State *L, lmprof_Report *R, const TraceEven
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMLINE)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("EvaluateScript")));
@@ -754,6 +1076,28 @@ static int __eventSampleInstance(lua_State *L, lmprof_Report *R, const TraceEven
 #else
     return LMPROF_REPORT_DISABLED_IO;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    char dur_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+    if (snprintf(dur_str, sizeof(dur_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(duration, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMLINE)));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("EvaluateScript")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("X")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), LUA_INT_CAST(R->st->thread.mainproc.pid));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), LUA_INT_CAST(LMPROF_THREAD_SAMPLE_TIMELINE));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("dur", "%s"), dur_str);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -785,7 +1129,7 @@ static int __eventUpdateCounters(lua_State *L, lmprof_Report *R, const TraceEven
 #if defined(LMPROF_FILE_API)
     FILE *f = R->f.file;
 
-    REPORT_ENSURE_DELIM(R);
+    REPORT_ENSURE_FILE_DELIM(R);
     fprintf(f, JSON_OPEN_OBJ);
     fprintf(f, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMLINE)));
     fprintf(f, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("UpdateCounters")));
@@ -805,6 +1149,33 @@ static int __eventUpdateCounters(lua_State *L, lmprof_Report *R, const TraceEven
 #else
     return LMPROF_REPORT_DISABLED_IO;
 #endif
+  }
+  else if (R->type == lBuffer) {
+    luaL_Buffer *b = &R->b.buff;
+    char hs_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    char ts_str[IDENTIFIER_BUFFER_LENGTH] = LMPROF_ZERO_STRUCT;
+    if (snprintf(ts_str, sizeof(ts_str), "%" PRIluTIME "", LMPROF_TIME_ADJ(event->call.s.time, R->st->conf)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+    if (snprintf(hs_str, sizeof(hs_str), "%" PRIluSIZE "", unit_allocated(&event->call.s)) < 0)
+      LMPROF_LOG("<%s>:sprintf encoding error\n", __FUNCTION__);
+
+    REPORT_ENSURE_BUFFER_DELIM(R);
+    luaL_addliteral(b, JSON_OPEN_OBJ);
+    luaL_addliteral(b, JSON_ASSIGN("cat", JSON_STRING(CHROME_TIMLINE)));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("name", JSON_STRING("UpdateCounters")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("ph", JSON_STRING("I")));
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("s", JSON_STRING("g")));
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("pid", LUA_INT_FORMAT), event->call.proc.pid);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("tid", LUA_INT_FORMAT), event->call.proc.tid);
+    luaL_addfstring(L, b, JSON_DELIM JSON_ASSIGN("ts", "%s"), ts_str);
+    luaL_addliteral(b, JSON_DELIM JSON_ASSIGN("args", JSON_OPEN_OBJ));
+    luaL_addliteral(b, JSON_ASSIGN("data", JSON_OPEN_OBJ));
+    luaL_addfstring(L, b, JSON_ASSIGN("jsHeapSizeUsed", "%s"), hs_str);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    luaL_addliteral(b, JSON_CLOSE_OBJ);
+    R->b.delim = 1;
+    return LUA_OK;
   }
   return LMPROF_REPORT_UNKNOWN_TYPE;
 }
@@ -878,6 +1249,7 @@ static void traceevent_table_events(lua_State *L, lmprof_Report *R, TraceEventTi
     }
   }
 
+  luaL_checkstack(L, 8, __FUNCTION__);
   for (page = list->head; page != l_nullptr; page = page->next) {
     size_t i;
     for (i = 0; i < page->count; ++i) {
@@ -951,7 +1323,7 @@ static void traceevent_table_events(lua_State *L, lmprof_Report *R, TraceEventTi
   }
 }
 
-static int traceevent_report_header(lua_State *L, const lmprof_Report *R) {
+static int traceevent_report_header(lua_State *L, lmprof_Report *R) {
   if (R->type == lTable) {
     lmprof_State *st = R->st;
     const TraceEventTimeline *list = l_pcast(TraceEventTimeline *, st->i.trace.arg);
@@ -1024,6 +1396,25 @@ static int traceevent_report(lua_State *L, lmprof_Report *report) {
     return LMPROF_REPORT_DISABLED_IO;
 #endif
   }
+  else if (report->type == lBuffer) {
+    if (BITFIELD_TEST(st->conf, LMPROF_OPT_TRACE_ABOUT_TRACING))
+      luaL_addliteral(&report->b.buff, JSON_OPEN_OBJ JSON_STRING("traceEvents") ":" JSON_OPEN_ARRAY JSON_NEWLINE);
+    else
+      luaL_addliteral(&report->b.buff, JSON_OPEN_ARRAY JSON_NEWLINE);
+
+    tracevent_table_header(L, report, list);
+    traceevent_table_events(L, report, list);
+    if (BITFIELD_TEST(st->conf, LMPROF_OPT_TRACE_ABOUT_TRACING)) {
+      report->f.delim = 0;
+      luaL_addliteral(&report->b.buff, JSON_CLOSE_ARRAY JSON_DELIM);
+      __metaAbout(L, report, LMPROF, LUA_VERSION);
+      luaL_addliteral(&report->b.buff, JSON_CLOSE_OBJ JSON_NEWLINE);
+    }
+    else {
+      luaL_addliteral(&report->b.buff, JSON_NEWLINE JSON_CLOSE_ARRAY JSON_NEWLINE);
+    }
+    return LUA_OK;
+  }
   return LMPROF_REPORT_FAILURE;
 }
 
@@ -1083,6 +1474,19 @@ LUA_API int lmprof_report(lua_State *L, lmprof_State *st, lmprof_ReportType type
       lua_pop(L, 1); /* Invalid encoding; return nil.*/
       lua_pushnil(L);
     }
+  }
+  else if (type == lBuffer) {
+    const int top = lua_gettop(L);
+    report.type = lBuffer;
+    report.b.delim = 0;
+    report.b.indent = "";
+    luaL_buffinit(L, &report.b.buff);
+    if (lmprof_push_report(L, &report) != LUA_OK) {
+      lua_settop(L, top); /* Invalid encoding; return nil.*/
+      lua_pushnil(L);
+    }
+
+    luaL_pushresult(&report.b.buff);
   }
   else if (type == lFile) {
 #if defined(LMPROF_FILE_API)

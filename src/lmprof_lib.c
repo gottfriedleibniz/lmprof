@@ -770,8 +770,10 @@ static LUA_INLINE lmprof_ReportType report_type(lua_State *L, lmprof_State *st, 
     if (out_file != l_nullptr)
       *out_file = lua_tostring(L, file_idx);
   }
+  else if (BITFIELD_TEST(st->conf, LMPROF_OPT_REPORT_STRING)) {
+    type = lBuffer;
+  }
 
-  UNUSED(st);
   return type;
 }
 
@@ -1138,6 +1140,7 @@ static int state_getoption(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_REPORT_VERBOSE:
+    case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
     case LMPROF_OPT_TRACE_IGNORE_YIELD:
     case LMPROF_OPT_TRACE_DRAW_FRAME:
@@ -1189,6 +1192,7 @@ static int state_setoption(lua_State *L) {
     case LMPROF_OPT_LOAD_STACK:
     case LMPROF_OPT_STACK_MISMATCH:
     case LMPROF_OPT_REPORT_VERBOSE:
+    case LMPROF_OPT_REPORT_STRING:
     case LMPROF_OPT_LINE_FREQUENCY:
     case LMPROF_OPT_TRACE_IGNORE_YIELD:
     case LMPROF_OPT_TRACE_DRAW_FRAME:

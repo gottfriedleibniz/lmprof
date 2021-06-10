@@ -50,6 +50,7 @@
 #define LMPROF_OPT_STACK_MISMATCH    0x20 /* Allow start/stop to be called at different stack levels. */
 
 #define LMPROF_OPT_REPORT_VERBOSE       0x1000 /* Include additional debug information */
+#define LMPROF_OPT_REPORT_STRING        0x2000 /* Output a formatted Lua string instead of an encoded table. */
 #define LMPROF_OPT_HASH_SIZE           0x40000 /* Reserved */
 #define LMPROF_OPT_LINE_FREQUENCY      0x80000 /* Reserved */
 

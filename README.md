@@ -25,7 +25,7 @@ The creation of graphs that relate activation records and measurements about the
 
   - Various techniques exist for aggregating functions: shared `GCObject` pointers, Lua closure pointers, hashing the fields of `lauxlib.pushfuncname`, function call site (e.g., parent line number) information, etc. See the `LMPROF_BUILTIN` build option.
 
-1. Profile records are maintained in a parent/child [structure](src/collections/lmprof_hash.h). That structure can then be [formatted](src/lmprof_report.h) into a Lua table or written to a file as a Lua compatible table.
+1. Profile records are maintained in a parent/child [structure](src/collections/lmprof_hash.h). That structure can be [formatted](src/lmprof_report.h) into a Lua table, a [string](https://www.lua.org/manual/5.4/manual.html#pdf-load) representation of the table, or written to file as a Lua [script](https://www.lua.org/manual/5.4/manual.html#pdf-dofile).
 
   - Future iterations may alleviate this condition, e.g., a graph structure per coroutine.
 
@@ -59,6 +59,9 @@ The exported API is broken down into four categories: **Configuration**, **Profi
 --      instantiation. Note, this option is closely related to mismatch.
 --    'line_freq' - Create a frequency list of line-executions for each profiled
 --      Lua function (graph instrumentation; requires "line" mode).
+--    'output_string' - Output a string representation of the formatted output.
+--        GRAPH - A Lua table; see '_G.load'
+--        TRACEEVENT - A formatted JSON string.
 --
 --  General Options: [INTEGER]
 --    'instructions' - Number of Lua instructions to execute before generating a
@@ -165,8 +168,8 @@ value = lmprof.has_io()
 state = lmprof.start(...)
 
 -- stop([output_path]): Stop the profiler singleton and build its results. If no
---  output_path is supplied a formatted Lua table/result is returned. Otherwise,
---  the success of the IO (true/false) is returned.
+--  output_path is supplied a formatted Lua table or string is returned.
+--  Otherwise, the success of the IO (true/false) is returned.
 --
 --  lmprof_report.h contains the specifications for the different "result"
 --  structures depending on the profile mode.

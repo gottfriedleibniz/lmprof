@@ -417,16 +417,20 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 1. [cpuprofile-fileformat](https://gperftools.github.io/gperftools/cpuprofile-fileformat.html) support.
 1. [perf.data](https://github.com/torvalds/linux/blob/master/tools/perf/Documentation/perf.data-file-format.txt) support.
 1. [DevTools Protocol](https://github.com/ChromeDevTools/devtools-protocol/blob/master/json/js_protocol.json) support, e.g., "ProfileNode" and other sampling features that can be mapped to Lua.
+1. [fx::ProfilerComponent](https://github.com/citizenfx/fivem/blob/master/code/components/citizen-scripting-core/src/Profiler.cpp) support and [compact](https://github.com/msgpack/msgpack-c) binary representation of `TraceEventTimeline`.
 
 ### TODO
 Ordered by priority.
 1. Update example outputs in [docs](docs/): most are outdated.
-1. Refactor. See the note in the header of lmprof.c.
+1. Path-based `lmprof.ignore`: ignore a function and all of its descendants.
+1. Include an API function to emulate v8's `CpuProfilingStatus`, e.g., `lmprof_check_can_profile` that returns a status code.
+1. Include configuration options similar to v8's `CpuProfilingLoggingMode` and `CpuProfilingNamingMode`.
 1. Handle RDTSC reset and `lu_time` overflows (especially on 32bit builds).
+1. Refactor. See the note in the header of lmprof.c.
+1. Rename bitfield macros to follow Lua's naming convention: a common prefix (`l_` or `lua`) for all exported declarations.
 1. Improve [Callgrind Format Specification](https://valgrind.org/docs/manual/cl-format.html) support, e.g., multi-threaded layouts.
 1. Experiment with non-uniform sampling, e.g., dynamically estimate a `LUA_MASKCOUNT` value that estimates sampling uniformly in the 'time' domain (instead of instructions). An alternative approach would to use OS-specific timers/signals to inform when sampling should occur (similar to LuaJIT).
 1. Casting from uint64_t (time/size measurement counters) to lua_Integer creates potential down-casting issues: traceevent_adjust and OPT_CLOCK_MICRO exist as potential solutions.
-1. Path-based `lmprof.ignore`: ignore the instrumentation of a function and all of its descendants.
 1. Encoded screenshot support: a Lua table (or another simple linked pager) of base64 encoded strings with optional limits on the amount of data that can be buffered.
 
 ## Sources & Acknowledgments:

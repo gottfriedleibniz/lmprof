@@ -423,6 +423,8 @@ lua.exe script.lua --input=codegen.lua --args="inp/natives_global.lua lua" --out
 Ordered by priority.
 1. Update example outputs in [docs](docs/): most are outdated.
 1. Path-based `lmprof.ignore`: ignore a function and all of its descendants.
+1. Experiment with Lua core profiling, e.g., use `LUA_USER_H`, `lua_lock`, `lua_unlock`, and `__FUNCTION__` to generate
+profiler events. Fairly unobtrusive and **should** only require compile time Lua flags (hopefully?).
 1. Include an API function to emulate v8's `CpuProfilingStatus`, e.g., `lmprof_check_can_profile` that returns a status code.
 1. Include configuration options similar to v8's `CpuProfilingLoggingMode` and `CpuProfilingNamingMode`.
 1. Handle RDTSC reset and `lu_time` overflows (especially on 32bit builds).

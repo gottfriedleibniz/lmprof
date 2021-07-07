@@ -13,21 +13,21 @@ The creation of graphs that relate activation records and measurements about the
 
 1. A [call stack](src/collections/lmprof_stack.h) maintains a sequence of instances: an activation record plus local statistics, e.g., time of `LUA_HOOKCALL/LUA_HOOKRET`, [Lua allocator](https://www.lua.org/manual/5.4/manual.html#lua_Alloc) use, tail-call information, etc.
 
-  - Each coroutine is allocated its own profiler stack. The `single_thread` profile mode can be used to prevent multiple coroutines ('thread' used interchangeably in this library) from being profiled.
+	- Each coroutine is allocated its own profiler stack. The `single_thread` profile mode can be used to prevent multiple coroutines ('thread' used interchangeably in this library) from being profiled.
 
-  - A sampling profiler based on `LUA_MASKCOUNT` rebuilds the [Lua stack](https://www.lua.org/manual/5.4/manual.html#lua_getstack) on each callback. Note, `LUA_MASKCOUNT` events only happen while the interpreter is executing a Lua function.
+	- A sampling profiler based on `LUA_MASKCOUNT` rebuilds the [Lua stack](https://www.lua.org/manual/5.4/manual.html#lua_getstack) on each callback. Note, `LUA_MASKCOUNT` events only happen while the interpreter is executing a Lua function.
 
-  - Specific profiler configurations may also use the line hook, `LUA_MASKLINE`, to generate frequency charts, etc.
+	- Specific profiler configurations may also use the line hook, `LUA_MASKLINE`, to generate frequency charts, etc.
 
 1. Call instances are [aggregated](src/collections/lmprof_record.h) into a collection of profile records: an 'aggregated' activation record plus statistics about all function instances that share the same activation, e.g., time spent in the function, amount of memory allocated while in the function, time spent in the children of the function, etc.
 
-  - The label/names of 'aggregated' activation record are resolved as the first non tail-call call that provides information (e.g., name/namewhat) about the function being profiled.
+	- The label/names of 'aggregated' activation record are resolved as the first non tail-call call that provides information (e.g., name/namewhat) about the function being profiled.
 
-  - Various techniques exist for aggregating functions: shared `GCObject` pointers, Lua closure pointers, hashing the fields of `lauxlib.pushfuncname`, function call site (e.g., parent line number) information, etc. See the `LMPROF_BUILTIN` build option.
+	- Various techniques exist for aggregating functions: shared `GCObject` pointers, Lua closure pointers, hashing the fields of `lauxlib.pushfuncname`, function call site (e.g., parent line number) information, etc. See the `LMPROF_BUILTIN` build option.
 
 1. Profile records are maintained in a parent/child [structure](src/collections/lmprof_hash.h). That structure can be [formatted](src/lmprof_report.h) into a Lua table, a [string](https://www.lua.org/manual/5.4/manual.html#pdf-load) representation of the table, or written to file as a Lua [script](https://www.lua.org/manual/5.4/manual.html#pdf-dofile).
 
-  - Future iterations may alleviate this condition, e.g., a graph structure per coroutine.
+	- Future iterations may alleviate this condition, e.g., a graph structure per coroutine.
 
 ### Event Profiling
 Creating *events* that can be used to generate flamegraphs, e.g., [devtools-frontend](https://github.com/ChromeDevTools/devtools-frontend) and [speedscope](https://github.com/jlfwong/speedscope).

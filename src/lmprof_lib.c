@@ -26,7 +26,16 @@ extern const char *const lmprof_state_strings[];
 extern const uint32_t lmprof_state_codes[];
 
 /* lua_State active function changed from int to struct in 5.2 */
-#if LUA_VERSION_NUM > 501
+#if LUA_VERSION_NUM >= 504
+  /*
+  ** 04e19712a5d48b84869f9942836ff8314fb0be8e introduced the possibility that a
+  ** (CFunc) tail call may generate a LUA_HOOKCALL event instead of LUA_HOOKTAILCALL:
+  ** https://github.com/lua/lua/blob/master/ldo.c#L538 .
+  **
+  ** Likely an oversight: ci->callstatus should be checked for CIST_TAIL.
+  */
+  #define LUA_IS_TAILCALL(AR) ((AR)->event == LUA_HOOKTAILCALL || (AR)->istailcall != 0)
+#elif LUA_VERSION_NUM > 501
   #define LUA_IS_TAILCALL(AR) ((AR)->event == LUA_HOOKTAILCALL)
 #else
   #define LUA_IS_TAILCALL(ar) 0
